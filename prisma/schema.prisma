@@ -25,7 +25,50 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  merchant  Merchant?
+
   @@map("users")
+}
+
+model Merchant {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade) 
+  businessName         String
+  category             String
+  location             String
+  phone                String
+  profilePictureUrl    String?
+  verificationStatus   VerificationStatus @default(PENDING)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  verification         MerchantVerification?
+
+  @@map("merchants")
+}
+
+model MerchantVerification {
+  id                    String   @id @default(cuid())
+  merchantId            String   @unique
+  merchant              Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  
+  governmentIdUrl       String
+  businessLicenseUrl    String?
+  productSampleUrl      String
+  businessAddress       String
+  registrationNumber    String?
+  
+  status                VerificationStatus @default(PENDING)
+  rejectionReason       String?
+  submittedAt           DateTime           @default(now())
+  reviewedAt            DateTime?
+  reviewedBy            String?
+  
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@map("merchant_verifications")
 }
 
 enum Role {
@@ -33,4 +76,10 @@ enum Role {
   MERCHANT
   MANAGER
   SUPPORT
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
 }

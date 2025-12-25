@@ -1,0 +1,88 @@
+import { Response } from 'express';
+import { MerchantService } from '../services/verification.service';
+import { AuthRequest } from '../types/auth.types';
+import path from 'path';
+
+const merchantService = new MerchantService();
+
+export class MerchantController {
+  async submitVerification(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized',
+        });
+      }
+
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+      // Validate required files
+      if (!files.governmentId?.[0] || !files.productSample?.[0]) {
+        return res.status(400).json({
+          success: false,
+          message: 'Required documents are missing',
+        });
+      }
+      
+      const verificationData = {
+        businessName: req.body.businessName,
+        category: req.body.category,
+        location: req.body.location,
+        phone: req.body.phone,
+        businessAddress: req.body.businessAddress,
+        registrationNumber: req.body.registrationNumber || undefined,
+        profilePictureUrl: files.profilePicture?.[0]?.path,
+        governmentIdUrl: files.governmentId[0].path,
+        businessLicenseUrl: files.businessLicense?.[0]?.path || undefined,
+        productSampleUrl: files.productSample[0].path,
+      };
+
+      const result = await merchantService.submitVerification(
+        req.user.userId,
+        verificationData
+      );
+
+      res.status(201).json({
+        success: true,
+        message: 'Verification submitted successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async getMerchantProfile(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized',
+        });
+      }
+
+      const profile = await merchantService.getMerchantProfile(req.user.userId);
+
+      if (!profile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Merchant profile not found',
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: profile,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+}

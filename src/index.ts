@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
 import testRoutes from './routes/test.routes';
 import teamRoutes from './routes/team.routes';
+import merchantRoutes from './routes/verification.routes';
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);
+app.use('/api/merchant', merchantRoutes);
 
 app.use('/api/test', testRoutes);
 
