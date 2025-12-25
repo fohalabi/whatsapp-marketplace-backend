@@ -14,14 +14,16 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  email      String   @unique
-  password   String
-  role       Role     @default(MERCHANT)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      Role     @default(MERCHANT)
+  isActive  Boolean  @default(true)
+  invitedBy String?
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
@@ -29,4 +31,6 @@ model User {
 enum Role {
   ADMIN
   MERCHANT
+  MANAGER
+  SUPPORT
 }
