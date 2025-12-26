@@ -25,7 +25,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  merchant  Merchant?
+  // Two-factor authentication fields
+  twoFactorEnabled    Boolean  @default(false)
+  twoFactorSecret     String?
+
+  merchant      Merchant?
+  preferences   UserPreferences?
+  activityLogs  ActivityLog[]
 
   @@map("users")
 }
@@ -147,6 +153,37 @@ model StockUpdateNotification {
   createdAt    DateTime @default(now())
 
   @@map("stock_update_notifications")
+}
+
+model UserPreferences {
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  emailNotifications  Boolean @default(true)
+  pushNotifications   Boolean @default(false)
+  theme               String  @default("light")
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action      String
+  description String?
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+
+  @@map("activity_logs")
+  @@index([userId, createdAt])
 }
 
 enum Role {
