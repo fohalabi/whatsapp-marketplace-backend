@@ -7,6 +7,7 @@ import teamRoutes from './routes/team.routes';
 import merchantRoutes from './routes/verification.routes';
 import productRoutes from './routes/product.routes';
 import orderRoutes from './routes/order.routes';
+import dashboardController from './routes/merchantdashboard.routes';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/merchant', merchantRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/merchantdashboard', dashboardController);
 
 app.use('/api/test', testRoutes);
 
