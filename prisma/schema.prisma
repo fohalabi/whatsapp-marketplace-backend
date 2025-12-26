@@ -45,6 +45,8 @@ model Merchant {
 
   verification         MerchantVerification?
 
+  products             Product[]
+
   @@map("merchants")
 }
 
@@ -71,6 +73,32 @@ model MerchantVerification {
   @@map("merchant_verifications")
 }
 
+model Product {
+  id              String            @id @default(cuid())
+  merchantId      String
+  merchant        Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  
+  name            String
+  description     String
+  category        String
+  price           Float
+  stockQuantity   Int
+  unit            String
+  minOrderQty     Int
+  
+  images          String[]
+  variants        Json?
+  
+  approvalStatus  ApprovalStatus    @default(PENDING)
+  rejectionReason String?
+  isActive        Boolean           @default(true)
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@map("products")
+}
+
 enum Role {
   ADMIN
   MERCHANT
@@ -81,5 +109,11 @@ enum Role {
 enum VerificationStatus {
   PENDING
   VERIFIED
+  REJECTED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
   REJECTED
 }
