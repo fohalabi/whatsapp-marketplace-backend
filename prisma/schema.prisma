@@ -46,6 +46,7 @@ model Merchant {
   verification         MerchantVerification?
 
   products             Product[]
+  orders               Order[]
 
   @@map("merchants")
 }
@@ -96,7 +97,43 @@ model Product {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
+  orderItems      OrderItem[]
+
   @@map("products")
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  merchantId      String
+  merchant        Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  
+  orderItems      OrderItem[]
+  
+  totalAmount     Float
+  status          OrderStatus   @default(PENDING)
+  pickupTime      DateTime
+  orderNotes      String?
+  rejectionReason String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  quantity    Int
+  price       Float
+  
+  createdAt   DateTime @default(now())
+
+  @@map("order_items")
 }
 
 enum Role {
@@ -115,5 +152,13 @@ enum VerificationStatus {
 enum ApprovalStatus {
   PENDING
   APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  READY
+  COMPLETED
   REJECTED
 }
