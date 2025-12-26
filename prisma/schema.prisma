@@ -136,6 +136,19 @@ model OrderItem {
   @@map("order_items")
 }
 
+model StockUpdateNotification {
+  id          String   @id @default(cuid())
+  merchantId  String
+  productId   String
+  productName String
+  oldStock    Int
+  newStock    Int
+  isRecieved  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@map("stock_update_notifications")
+}
+
 enum Role {
   ADMIN
   MERCHANT

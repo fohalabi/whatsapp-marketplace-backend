@@ -35,4 +35,10 @@ router.delete(
   (req, res) => productController.deleteProduct(req, res)
 );
 
+// Update product stock
+router.post(
+  '/:productId/restock',
+  (req, res) => productController.updateProductStock(req, res)
+);
+
 export default router;

@@ -103,4 +103,38 @@ export class ProductService {
 
     return { message: 'Product deleted successfully' };
   }
+
+  async updateProductStock(productId: string, merchantId: string, newStock: number) {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new Error('Product not found');
+    }
+
+    if (product.merchantId !== merchantId) {
+      throw new Error('Unauthorized to update this product');
+    }
+
+    const oldStock = product.stockQuantity;
+
+    const updatedProduct = await prisma.product.update({
+      where: { id: productId },
+      data: { stockQuantity: newStock },
+    });
+
+    // Create notification for admin
+    await prisma.stockUpdateNotification.create({
+      data: {
+        merchantId,
+        productId,
+        productName: product.name,
+        oldStock,
+        newStock,
+      },
+    });
+
+    return updatedProduct;
+  }
 }

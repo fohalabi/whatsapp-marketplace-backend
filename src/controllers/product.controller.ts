@@ -190,4 +190,60 @@ export class ProductController {
       });
     }
   }
+
+  async updateProductStock(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized',
+        });
+      }
+
+      const { productId } = req.params;
+      const { stock } = req.body;
+
+      if (!productId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Product ID is required',
+        });
+      }
+
+      if (stock === undefined || stock < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid stock quantity is required',
+        });
+      }
+
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user.userId },
+      });
+
+      if (!merchant) {
+        return res.status(404).json({
+          success: false,
+          message: 'Merchant profile not found',
+        });
+      }
+
+      const product = await productService.updateProductStock(
+        productId,
+        merchant.id,
+        parseInt(stock)
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Stock updated successfully',
+        data: product,
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 }
