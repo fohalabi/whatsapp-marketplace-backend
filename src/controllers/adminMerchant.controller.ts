@@ -182,4 +182,50 @@ export class AdminMerchantController {
       });
     }
   }
+
+  async suspendMerchant(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const merchantId = req.params.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ success: false, message: 'Merchant ID required' });
+      }
+
+      const merchant = await adminMerchantService.suspendMerchant(merchantId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Merchant suspended',
+        data: merchant
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  async activateMerchant(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      const merchantId = req.params.merchantId;
+      if (!merchantId) {
+        return res.status(400).json({ success: false, message: 'Merchant ID required' });
+      }
+
+      const merchant = await adminMerchantService.activateMerchant(merchantId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Merchant activated',
+        data: merchant
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
 }

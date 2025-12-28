@@ -35,4 +35,16 @@ router.patch(
   adminMerchantController.rejectStep.bind(adminMerchantController)
 );
 
+router.patch(
+  '/:merchahntId/suspend',
+  authorize('ADMIN'),
+  adminMerchantController.suspendMerchant.bind(adminMerchantController)
+);
+
+router.patch(
+  '/:merchantId/activate',
+  authorize('ADMIN'),
+  adminMerchantController.activateMerchant.bind(adminMerchantController)
+);
+
 export default router;
