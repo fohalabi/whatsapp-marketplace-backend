@@ -58,9 +58,9 @@ model Merchant {
 }
 
 model MerchantVerification {
-  id                    String   @id @default(cuid())
-  merchantId            String   @unique
-  merchant              Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  id                    String             @id @default(cuid())
+  merchantId            String             @unique
+  merchant              Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   
   governmentIdUrl       String
   businessLicenseUrl    String?
@@ -69,6 +69,26 @@ model MerchantVerification {
   registrationNumber    String?
   
   status                VerificationStatus @default(PENDING)
+  
+  idVerificationStatus       VerificationStatus @default(PENDING)
+  locationVerificationStatus VerificationStatus @default(PENDING)
+  productSampleStatus        VerificationStatus @default(PENDING)
+  
+  businessLicenseStatus      VerificationStatus?
+  registrationNumberStatus   VerificationStatus?
+  
+  idVerifiedAt               DateTime?
+  locationVerifiedAt         DateTime?
+  productSampleVerifiedAt    DateTime?
+  businessLicenseVerifiedAt  DateTime?
+  registrationNumberVerifiedAt DateTime?
+  
+  idRejectionReason          String?
+  locationRejectionReason    String?
+  productRejectionReason     String?
+  businessLicenseRejectionReason String?
+  registrationNumberRejectionReason String?
+  
   rejectionReason       String?
   submittedAt           DateTime           @default(now())
   reviewedAt            DateTime?
@@ -162,7 +182,7 @@ model UserPreferences {
   
   emailNotifications  Boolean @default(true)
   pushNotifications   Boolean @default(false)
-  theme               String  @default("light")
+  // theme               String  @default("light")
   
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

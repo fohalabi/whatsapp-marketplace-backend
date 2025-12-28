@@ -25,4 +25,10 @@ router.get(
   merchantController.getMerchantProfile.bind(merchantController)
 );
 
+router.patch(
+  '/password',
+  authenticate,
+  merchantController.changePassword.bind(merchantController)
+);
+
 export default router;

@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { MerchantService } from '../services/verification.service';
 import { AuthRequest } from '../types/auth.types';
 import path from 'path';
+import { comparePassword, hashPassword } from '../utils/password.utils';
+import prisma from '../config/database';
 
 const merchantService = new MerchantService();
 
@@ -77,6 +79,63 @@ export class MerchantController {
       res.status(200).json({
         success: true,
         data: profile,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async changePassword(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized',
+        });
+      }
+
+      const { currentPassword, newPassword } = req.body;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password and new password are required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+
+      const isValid = await comparePassword(currentPassword, user.password);
+
+      if (!isValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current password is incorrect',
+        });
+      }
+
+      const newHashedPassword = await hashPassword(newPassword);
+
+      await prisma.user.update({
+        where: { id: req.user.userId },
+        data: { password: newHashedPassword },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Password changed successfully',
       });
     } catch (error: any) {
       res.status(500).json({
