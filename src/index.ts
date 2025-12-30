@@ -10,6 +10,7 @@ import orderRoutes from './routes/order.routes';
 import dashboardController from './routes/merchantdashboard.routes';
 import adminProfileRoutes from './routes/adminProfile.routes';
 import adminMerchantRoutes from './routes/adminMerchant.routes';
+import adminProductRoute from './routes/admin.products.routes'
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/merchantdashboard', dashboardController);
 app.use('/api/admin/profile', adminProfileRoutes);
 app.use('/api/admin/merchants', adminMerchantRoutes);
+app.use('/api/admin/products', adminProductRoute)
 
 app.use('/api/test', testRoutes);
 

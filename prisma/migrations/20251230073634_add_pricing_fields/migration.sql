@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "products" ADD COLUMN     "markup" DOUBLE PRECISION DEFAULT 0,
+ADD COLUMN     "retailPrice" DOUBLE PRECISION;
