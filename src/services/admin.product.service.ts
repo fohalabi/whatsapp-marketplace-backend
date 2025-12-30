@@ -2,32 +2,39 @@ import prisma from '../config/database';
 
 export class AdminProductService {
   async getAllProducts(
-    status?: 'PENDING' | 'APPROVED' | 'REJECTED',
-    limit: number = 10,
-    skip: number = 0
-  ) {
-    const where = status ? { approvalStatus: status } : {};
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED',
+  limit: number = 10,
+  skip: number = 0
+) {
+  const where = status ? { approvalStatus: status } : {};
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        include: {
-          merchant: {
-            select: {
-              id: true,
-              businessName: true,
-            },
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: {
+        merchant: {
+          select: {
+            id: true,
+            businessName: true,
           },
         },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip,
-      }),
-      prisma.product.count({ where }),
-    ]);
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip,
+    }),
+    prisma.product.count({ where }),
+  ]);
 
-    return { products, total };
-  }
+  // Add default values for markup and retailPrice if missing
+  const productsWithDefaults = products.map(p => ({
+    ...p,
+    markup: p.markup ?? 0,
+    retailPrice: p.retailPrice ?? p.price,
+  }));
+
+  return { products: productsWithDefaults, total };
+}
 
   async approveProduct(productId: string) {
     const product = await prisma.product.findUnique({
