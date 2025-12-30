@@ -25,6 +25,12 @@ router.get(
   merchantController.getMerchantProfile.bind(merchantController)
 );
 
+router.put(
+  '/profile',
+  authenticate,
+  merchantController.updateMerchantProfile.bind(merchantController)
+);
+
 router.patch(
   '/password',
   authenticate,

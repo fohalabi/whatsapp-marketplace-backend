@@ -69,16 +69,10 @@ export class MerchantController {
 
       const profile = await merchantService.getMerchantProfile(req.user.userId);
 
-      if (!profile) {
-        return res.status(404).json({
-          success: false,
-          message: 'Merchant profile not found',
-        });
-      }
-
+      // returns null if no profile found
       res.status(200).json({
         success: true,
-        data: profile,
+        data: profile || null,
       });
     } catch (error: any) {
       res.status(500).json({
@@ -136,6 +130,43 @@ export class MerchantController {
       res.status(200).json({
         success: true,
         message: 'Password changed successfully',
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async updateMerchantProfile(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized',
+        });
+      }
+
+      const { businessName, category, location, phone } = req.body;
+
+      // Validation
+      if (!businessName || !category || !location) {
+        return res.status(400).json({
+          success: false,
+          message: 'All fields are required',
+        });
+      }
+
+      const updatedProfile = await merchantService.updateMerchantProfile(
+        req.user.userId,
+        { businessName, category, location, phone }
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: updatedProfile,
       });
     } catch (error: any) {
       res.status(500).json({

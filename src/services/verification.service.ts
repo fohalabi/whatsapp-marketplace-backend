@@ -62,7 +62,42 @@ export class MerchantService {
   async getMerchantProfile(userId: string) {
     const merchant = await prisma.merchant.findUnique({
       where: { userId },
-      include: { verification: true }
+      include: { 
+        verification: true,
+        user: {
+          select: { email: true }
+        }
+      }
+    });
+
+    return merchant;
+  }
+
+  async updateMerchantProfile(
+    userId: string, 
+    data: { businessName: string; category: string; location: string; phone: string }
+  ) {
+    const merchant = await prisma.merchant.upsert({
+      where: { userId },
+      update: {
+        businessName: data.businessName,
+        category: data.category,
+        location: data.location,
+        phone: data.phone,
+      },
+      create: {
+        userId,
+        businessName: data.businessName,
+        category: data.category,
+        location: data.location,
+        phone: data.phone,
+      },
+      include: {
+        user: {
+          select: { email: true }
+        },
+        verification: true
+      }
     });
 
     return merchant;

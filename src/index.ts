@@ -25,7 +25,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/merchant', merchantRoutes);
-app.use('/api/products', productRoutes);
+app.use('/api/merchant/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/merchantdashboard', dashboardController);
 app.use('/api/admin/profile', adminProfileRoutes);

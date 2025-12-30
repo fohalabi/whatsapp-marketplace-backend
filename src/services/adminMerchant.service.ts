@@ -161,7 +161,7 @@ export class AdminMerchantService {
     return updatedVerification;
   }
 
-  async getAllMerchants(status?: VerificationStatus) {
+  async getAllMerchants(status?: VerificationStatus, limit?: number, skip?: number) {
     const where = status ? { verificationStatus: status } : {};
 
     const merchants = await prisma.merchant.findMany({
@@ -178,10 +178,14 @@ export class AdminMerchantService {
       },
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      ...(limit !== undefined && { take: limit }),
+      ...(skip !== undefined && { skip: skip })
     });
 
-    return merchants;
+    const total = await prisma.merchant.count({ where });
+
+    return { merchants, total };
   }
 
   async suspendMerchant(merchantId: string) {

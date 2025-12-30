@@ -168,12 +168,22 @@ export class AdminMerchantController {
         });
       }
 
-      const { status } = req.query;
-      const merchants = await adminMerchantService.getAllMerchants(status as any);
+      const { status, limit, skip } = req.query;
+      const parsedLimit = limit ? parseInt(limit as string) : 10;
+      const parsedSkip = skip ? parseInt(skip as string) : 0;
+
+      const result = await adminMerchantService.getAllMerchants(
+        status as any,
+        parsedLimit,
+        parsedSkip
+      );
 
       res.status(200).json({
         success: true,
-        data: merchants
+        data: result.merchants,
+        total: result.total,
+        limit: parsedLimit,
+        skip: parsedSkip
       });
     } catch (error: any) {
       res.status(500).json({

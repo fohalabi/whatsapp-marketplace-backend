@@ -36,7 +36,7 @@ router.patch(
 );
 
 router.patch(
-  '/:merchahntId/suspend',
+  '/:merchantId/suspend',
   authorize('ADMIN'),
   adminMerchantController.suspendMerchant.bind(adminMerchantController)
 );
