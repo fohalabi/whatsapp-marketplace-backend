@@ -153,9 +153,9 @@ export class AdminProductController {
         message: error.message,
         });
     }
-    }
+  }
 
-    async bulkUpdatePricing(req: AuthRequest, res: Response) {
+  async bulkUpdatePricing(req: AuthRequest, res: Response) {
     try {
         const { productIds, markup } = req.body;
 
@@ -189,9 +189,9 @@ export class AdminProductController {
         message: error.message,
         });
     }
-    }
+  }
 
-    async toggleProductStatus(req: AuthRequest, res: Response) {
+  async toggleProductStatus(req: AuthRequest, res: Response) {
     try {
         const { productId } = req.params;
         const { isActive } = req.body;
@@ -226,5 +226,21 @@ export class AdminProductController {
         message: error.message,
         });
     }
+  }
+
+  async getProductsForSync(req: AuthRequest, res: Response) {
+    try {
+      const products = await adminProductService.getProductsForSync();
+
+      res.status(200).json({
+        success: true,
+        data: products,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
     }
+  }
 }

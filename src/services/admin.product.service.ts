@@ -117,9 +117,9 @@ export class AdminProductService {
     });
 
     return updated;
-    }
+  }
 
-    async bulkUpdatePricing(productIds: string[], markup: number) {
+  async bulkUpdatePricing(productIds: string[], markup: number) {
     // Get all products
     const products = await prisma.product.findMany({
         where: { id: { in: productIds } },
@@ -141,9 +141,9 @@ export class AdminProductService {
     await Promise.all(updates);
 
     return { updated: productIds.length };
-    }
+  }
 
-    async toggleProductStatus(productId: string, isActive: boolean) {
+  async toggleProductStatus(productId: string, isActive: boolean) {
     const product = await prisma.product.findUnique({
         where: { id: productId },
     });
@@ -158,5 +158,47 @@ export class AdminProductService {
     });
 
     return updated;
-    }
+  }
+
+  async getProductsForSync() {
+    const products = await prisma.product.findMany({
+      where: {
+        approvalStatus: 'APPROVED',
+        isActive: true,
+        stockQuantity: { gt: 0 }
+      },
+      include: {
+        merchant: {
+          select: {
+            id: true,
+            businessName: true,
+          },
+        },
+      },
+    });
+
+    return products;
+  }
+
+  async syncProductToWhatsApp(productId: string, whatsappProductId: string) {
+    const updated = await prisma.product.update({
+      where: { id: productId },
+      data: {
+        whatsappProductId,
+        whatsappSyncStatus: 'SYNCED',
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    return updated;
+  }
+
+  async markSyncFailed(productId: string) {
+    await prisma.product.update({
+      where: { id: productId},
+      data: {
+        whatsappSyncStatus: 'FAILED',
+      },
+    });
+  }
 }

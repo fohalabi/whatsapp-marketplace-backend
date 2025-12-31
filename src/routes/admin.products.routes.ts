@@ -29,4 +29,6 @@ router.patch('/:productId/pricing', (req, res) => adminProductController.updateP
 // Toggle status
 router.patch('/:productId/toggle-status', (req, res) => adminProductController.toggleProductStatus(req, res));
 
+router.get('/sync-products', (req, res) => adminProductController.getProductsForSync(req, res));
+
 export default router;

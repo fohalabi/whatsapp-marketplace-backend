@@ -122,6 +122,10 @@ model Product {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
+  whatsappProductId       String?
+  whatsappSyncStatus      SyncStatus @default(NOT_SYNCED)
+  lastSyncedAt            DateTime?
+
   orderItems      OrderItem[]
 
   @@map("products")
@@ -230,4 +234,10 @@ enum OrderStatus {
   READY
   COMPLETED
   REJECTED
+}
+
+enum SyncStatus {
+  NOT_SYNCED
+  SYNCED
+  FAILED
 }
