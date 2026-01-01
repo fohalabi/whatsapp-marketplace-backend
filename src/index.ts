@@ -13,6 +13,7 @@ import adminMerchantRoutes from './routes/adminMerchant.routes';
 import adminProductRoute from './routes/admin.products.routes';
 import whatsappRoutes from './routes/whatsapp.routes';
 import teamManagementRoutes from './routes/teamManagement.routes';
+import whatsappWebhookRoutes from './routes/whatsapp.webhook.routes';
 
 dotenv.config();
 
@@ -24,6 +25,8 @@ app.use(express.json());
 
 // serve uploadd files
 app.use('/uploads', express.static('uploads'));
+
+app.use('api/whatsapp', whatsappWebhookRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);

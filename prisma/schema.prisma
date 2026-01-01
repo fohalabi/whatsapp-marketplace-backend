@@ -212,6 +212,18 @@ model ActivityLog {
   @@index([userId, createdAt])
 }
 
+model CustomerMessage {
+  id              String    @id @default(cuid())
+  messageId       String    @unique //whatsapp message 
+  from            String    // customer phone number
+  message         String    @db.Text
+  timestamp       DateTime  @default(now())
+  isRead          Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  @@map("customer_message")
+}
+
 enum Role {
   ADMIN
   MERCHANT
