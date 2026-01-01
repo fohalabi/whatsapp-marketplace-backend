@@ -201,4 +201,18 @@ export class AdminProductService {
       },
     });
   }
+
+  async getProductById(productId: string) {
+    return await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        merchant: {
+          select: {
+            id: true,
+            businessName: true,
+          },
+        },
+      },
+    });
+  }
 }

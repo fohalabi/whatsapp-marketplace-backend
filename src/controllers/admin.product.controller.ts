@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AdminProductService } from '../services/admin.product.service';
 import { AuthRequest } from '../types/auth.types';
+import { WhatsAppService } from '../services/whatsapp.service';
 
 const adminProductService = new AdminProductService();
 
@@ -235,6 +236,74 @@ export class AdminProductController {
       res.status(200).json({
         success: true,
         data: products,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async syncSingleProduct(req: AuthRequest, res: Response) {
+    try {
+      const { productId } = req.params;
+
+      if (!productId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Product ID is required',
+        });
+      }
+
+      const whatsappService = new WhatsAppService();
+      const product = await adminProductService.getProductById(productId);
+      
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found',
+        });
+      }
+
+      const whatsappProductId = await whatsappService.syncProductToCatalog(product);
+      await adminProductService.syncProductToWhatsApp(productId, whatsappProductId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Product synced successfully',
+      });
+    } catch (error: any) {
+      const { productId } = req.params;
+      if (productId) {
+        await adminProductService.markSyncFailed(productId);
+      }
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async syncAllProducts(req: AuthRequest, res: Response) {
+    try {
+      const whatsappService = new WhatsAppService();
+      const products = await adminProductService.getProductsForSync();
+
+      const results = await Promise.allSettled(
+        products.map(async (product) => {
+          const whatsappProductId = await whatsappService.syncProductToCatalog(product);
+          await adminProductService.syncProductToWhatsApp(product.id, whatsappProductId);
+        })
+      );
+
+      const successful = results.filter((r) => r.status === 'fulfilled').length;
+      const failed = results.filter((r) => r.status === 'rejected').length;
+
+      res.status(200).json({
+        success: true,
+        message: `Synced ${successful} products. ${failed} failed.`,
+        data: { successful, failed },
       });
     } catch (error: any) {
       res.status(500).json({

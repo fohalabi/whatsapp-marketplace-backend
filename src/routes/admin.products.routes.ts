@@ -31,4 +31,8 @@ router.patch('/:productId/toggle-status', (req, res) => adminProductController.t
 
 router.get('/sync-products', (req, res) => adminProductController.getProductsForSync(req, res));
 
+router.post('/sync-all', (req, res) => adminProductController.syncAllProducts(req, res));
+
+router.post('/:productId/sync', (req, res) => adminProductController.syncSingleProduct(req, res));
+
 export default router;

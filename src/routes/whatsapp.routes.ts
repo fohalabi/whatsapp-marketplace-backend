@@ -1,36 +1,13 @@
-// routes/whatsapp.routes.ts
 import { Router } from 'express';
+import { WhatsAppController } from '../controllers/whatsapp.controller';
+import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
+const whatsappController = new WhatsAppController();
 
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+router.use(authenticate);
+router.use(authorize('ADMIN'));
 
-router.post('/send-message', async (req, res) => {
-  const { to, message } = req.body;
-  
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v22.0/958901867299863/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer EAAeQJTyKTQ8BQaHjYnUTcBn082EeOBAysWisiAElsudSt1J3tqXS0y9Yalu6vSOgiAyfhHGkQDiua8vwEQzKYfswyhJFiApVHHgCsimnwah46ZBFJNBxOpKlyeih8sFGG3SKzGaKUQDmHbYzwTguWEgo2xSKwisynqJjThZCKEh4UDLh1tLnBdJNgVBnxpzJu4QJXkcihgZBP65uUkSSZBPG65EQ5OQ4hwiANwt2CmKkyYBnvhLySfVrvwVCmT4JUTPXZByqE3JZCMzvRUyo2q`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: to,
-          text: { body: message }
-        })
-      }
-    );
-    
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to send message' });
-  }
-});
+router.post('/send-message', (req, res) => whatsappController.sendMessage(req, res));
 
 export default router;

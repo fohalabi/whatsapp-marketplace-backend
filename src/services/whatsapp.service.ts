@@ -16,7 +16,7 @@ export class WhatsAppService {
   async syncProductToCatalog(product: Product) {
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v21.0/${CATALOG_ID}/products`,
+        `https://graph.facebook.com/v22.0/${CATALOG_ID}/products`,
         {
           method: 'POST',
           headers: {
@@ -52,7 +52,7 @@ export class WhatsAppService {
   async sendMessage(to: string, message: string) {
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`,
+        `https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`,
         {
           method: 'POST',
           headers: {
