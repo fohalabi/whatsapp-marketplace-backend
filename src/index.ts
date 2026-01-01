@@ -12,6 +12,7 @@ import adminProfileRoutes from './routes/adminProfile.routes';
 import adminMerchantRoutes from './routes/adminMerchant.routes';
 import adminProductRoute from './routes/admin.products.routes';
 import whatsappRoutes from './routes/whatsapp.routes';
+import teamManagementRoutes from './routes/teamManagement.routes';
 
 dotenv.config();
 
@@ -33,8 +34,8 @@ app.use('/api/merchantdashboard', dashboardController);
 app.use('/api/admin/profile', adminProfileRoutes);
 app.use('/api/admin/merchants', adminMerchantRoutes);
 app.use('/api/admin/products', adminProductRoute);
-
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/admin/team', teamManagementRoutes);
 
 app.use('/api/test', testRoutes);
 
