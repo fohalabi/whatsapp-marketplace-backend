@@ -14,6 +14,7 @@ import adminProductRoute from './routes/admin.products.routes';
 import whatsappRoutes from './routes/whatsapp.routes';
 import teamManagementRoutes from './routes/teamManagement.routes';
 import whatsappWebhookRoutes from './routes/whatsapp.webhook.routes';
+import paystackWebhookRoutes from './routes/paystack.webhook.routes';
 
 dotenv.config();
 
@@ -26,7 +27,8 @@ app.use(express.json());
 // serve uploadd files
 app.use('/uploads', express.static('uploads'));
 
-app.use('api/whatsapp', whatsappWebhookRoutes);
+app.use('/api/paystack', paystackWebhookRoutes)
+app.use('/api/whatsapp', whatsappWebhookRoutes);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);
@@ -39,6 +41,7 @@ app.use('/api/admin/merchants', adminMerchantRoutes);
 app.use('/api/admin/products', adminProductRoute);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/admin/team', teamManagementRoutes);
+
 
 app.use('/api/test', testRoutes);
 

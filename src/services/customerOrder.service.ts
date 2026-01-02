@@ -54,4 +54,15 @@ export class OrderService {
       },
     });
   }
+
+  async getOrderByReference(reference: string) {
+    return await prisma.customerOrder.findUnique({
+      where: { paymentReference: reference },
+      include: {
+        items: {
+          include: { product: true },
+        },
+      },
+    });
+  }
 }
