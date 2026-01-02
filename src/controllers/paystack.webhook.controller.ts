@@ -70,11 +70,7 @@ export class PaystackWebhookController {
     await orderService.reduceStock(order.id);
 
     // Generate invoice
-    const { invoice, pdfPath } = await invoiceService.createInvoice(order.id);
-
-    // Get PDF public URL
-    const fileName = path.basename(pdfPath);
-    const pdfUrl = `${process.env.BACKEND_URL}/invoices/${fileName}`;
+    const { invoice, pdfUrl } = await invoiceService.createInvoice(order.id);
 
     // Send invoice via WhatsApp
     await whatsappService.sendDocument(

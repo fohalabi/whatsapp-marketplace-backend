@@ -1,13 +1,12 @@
 import PDFDocument from 'pdfkit';
 import prisma from '../config/database';
-import fs from 'fs';
-import path from 'path';
+import cloudinary from '../config/cloudinary';
+import { Readable } from 'stream';
 
 export class InvoiceService {
   async generateInvoiceNumber(): Promise<string> {
     const year = new Date().getFullYear();
     
-    // Count invoices created this year
     const count = await prisma.invoice.count({
       where: {
         invoiceNumber: {
@@ -21,7 +20,6 @@ export class InvoiceService {
   }
 
   async createInvoice(orderId: string) {
-    // Get order details
     const order = await prisma.customerOrder.findUnique({
       where: { id: orderId },
       include: {
@@ -33,10 +31,8 @@ export class InvoiceService {
 
     if (!order) throw new Error('Order not found');
 
-    // Generate invoice number
     const invoiceNumber = await this.generateInvoiceNumber();
 
-    // Create invoice record
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
@@ -44,35 +40,57 @@ export class InvoiceService {
       },
     });
 
-    // Generate PDF
-    const pdfPath = await this.generatePDF(invoice.invoiceNumber, order);
+    // Generate and upload PDF to Cloudinary
+    const pdfUrl = await this.generateAndUploadPDF(invoice.invoiceNumber, order);
 
-    // Update invoice with PDF path
     await prisma.invoice.update({
       where: { id: invoice.id },
-      data: { pdfUrl: pdfPath },
+      data: { pdfUrl },
     });
 
-    return { invoice, pdfPath };
+    return { invoice, pdfUrl };
   }
 
-  private async generatePDF(invoiceNumber: string, order: any): Promise<string> {
+  private async generateAndUploadPDF(invoiceNumber: string, order: any): Promise<string> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50 });
+      const chunks: Buffer[] = [];
+
+      // Collect PDF data in memory
+      doc.on('data', (chunk) => chunks.push(chunk));
       
-      // Create invoices directory if not exists
-      const invoicesDir = path.join(process.cwd(), 'invoices');
-      if (!fs.existsSync(invoicesDir)) {
-        fs.mkdirSync(invoicesDir, { recursive: true });
-      }
+      doc.on('end', async () => {
+        try {
+          const pdfBuffer = Buffer.concat(chunks);
 
-      const fileName = `${invoiceNumber}.pdf`;
-      const filePath = path.join(invoicesDir, fileName);
-      const writeStream = fs.createWriteStream(filePath);
+          // Upload to Cloudinary
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              resource_type: 'raw',
+              folder: 'invoices',
+              public_id: invoiceNumber,
+              format: 'pdf',
+            },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result!.secure_url);
+              }
+            }
+          );
 
-      doc.pipe(writeStream);
+          // Convert buffer to stream and pipe to Cloudinary
+          const readableStream = Readable.from(pdfBuffer);
+          readableStream.pipe(uploadStream);
+        } catch (error) {
+          reject(error);
+        }
+      });
 
-      // Header
+      doc.on('error', reject);
+
+      // Generate PDF content (same as before)
       doc.fontSize(20).text('INVOICE', { align: 'center' });
       doc.moveDown();
       
@@ -82,19 +100,16 @@ export class InvoiceService {
       doc.text(`Payment Reference: ${order.paymentReference}`);
       doc.moveDown();
 
-      // Customer Info
       doc.fontSize(14).text('Customer Information', { underline: true });
       doc.fontSize(10);
       doc.text(`Phone: ${order.customerPhone}`);
       doc.text(`Email: ${order.customerEmail}`);
       doc.moveDown();
 
-      // Order Items
       doc.fontSize(14).text('Order Items', { underline: true });
       doc.fontSize(10);
       doc.moveDown(0.5);
 
-      // Table header
       const tableTop = doc.y;
       doc.text('Item', 50, tableTop);
       doc.text('Qty', 300, tableTop);
@@ -105,7 +120,6 @@ export class InvoiceService {
       
       let yPosition = tableTop + 25;
 
-      // Table rows
       order.items.forEach((item: any) => {
         const total = item.quantity * item.price;
         doc.text(item.product.name, 50, yPosition, { width: 240 });
@@ -118,7 +132,6 @@ export class InvoiceService {
       doc.moveTo(50, yPosition).lineTo(550, yPosition).stroke();
       yPosition += 15;
 
-      // Total
       doc.fontSize(12).text('Total Amount:', 370, yPosition);
       doc.text(`₦${order.totalAmount.toLocaleString()}`, 470, yPosition);
       
@@ -127,9 +140,6 @@ export class InvoiceService {
       doc.text('Thank you for your purchase!', { align: 'center' });
 
       doc.end();
-
-      writeStream.on('finish', () => resolve(filePath));
-      writeStream.on('error', reject);
     });
   }
 }

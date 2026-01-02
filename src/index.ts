@@ -18,7 +18,6 @@ import whatsappRoutes from './routes/whatsapp.routes';
 import teamManagementRoutes from './routes/teamManagement.routes';
 import whatsappWebhookRoutes from './routes/whatsapp.webhook.routes';
 import paystackWebhookRoutes from './routes/paystack.webhook.routes';
-import invoiceRoutes from './routes/invoice.routes';
 
 dotenv.config();
 
@@ -49,7 +48,6 @@ app.use('/api/admin/merchants', adminMerchantRoutes);
 app.use('/api/admin/products', adminProductRoute);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/admin/team', teamManagementRoutes);
-app.use('/api', invoiceRoutes);
 app.use('/api/test', testRoutes);
 
 app.get('/health', (req, res) => {
