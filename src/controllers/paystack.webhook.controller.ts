@@ -4,10 +4,12 @@ import { OrderService } from '../services/customerOrder.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { InvoiceService } from '../services/invoice.service';
 import path from 'path';
+import { getRedis } from '../config/redis';
 
 const orderService = new OrderService();
 const whatsappService = new WhatsAppService();
 const invoiceService = new InvoiceService();
+const processWebhooks = new Set<string>();
 
 export class PaystackWebhookController {
   async handleWebhook(req: Request, res: Response) {
@@ -24,6 +26,19 @@ export class PaystackWebhookController {
       }
 
       const event = req.body;
+      const webhookId = `${event.event}-${event.data.reference}`;
+
+      // Check if already processed
+      const redis = getRedis();
+      const exists = await redis.get(webhookId);
+
+      if (exists) {
+        console.log('Webhook already processed:', webhookId);
+        return res.sendStatus(200);
+      }
+
+      // Mark as processed
+      await redis.setex(webhookId, 86400, '1');
 
       // Handle successful payment
       if (event.event === 'charge.success') {

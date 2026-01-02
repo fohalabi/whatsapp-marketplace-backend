@@ -55,6 +55,43 @@ export class WhatsAppWebhookController {
     const customerPhone = orderData.from;
     const order = orderData.order;
 
+    // Extract order items
+    const items = order.product_items.map((item: any) => ({
+      productId: item.product_retailer_id,
+      quantity: item.quantity,
+      price: item.item_price,
+    }));
+
+    // Check stock availability 
+    const whatsappService = new WhatsAppService();
+    
+    for (const item of items) {
+      const product = await prisma.product.findUnique({
+        where: { id: item.productId },
+      });
+
+      if (!product) {
+        await whatsappService.sendMessage(
+          customerPhone,
+          `❌ Sorry, product not found. Please try again or contact support.`
+        );
+        return;
+      }
+
+      if (product.stockQuantity < item.quantity) {
+        await whatsappService.sendMessage(
+          customerPhone,
+          `❌ Insufficient stock for ${product.name}.
+
+          Available: ${product.stockQuantity} units
+          Requested: ${item.quantity} units
+
+          Please reduce your order quantity and try again.`
+        );
+        return;
+      }
+    }
+
     // Check if customer has existing pending order
     const existingPendingOrder = await prisma.customerOrder.findFirst({
       where: {
@@ -64,21 +101,14 @@ export class WhatsAppWebhookController {
     });
 
     if (existingPendingOrder) {
-      const whatsappService = new WhatsAppService();
       await whatsappService.sendMessage(
         customerPhone,
         `⚠️ You already have a pending order (${existingPendingOrder.orderNumber}).
+        
         Please complete payment for that order first before placing a new one.`
       );
       return;
     }
-
-    // Extract order items
-    const items = order.product_items.map((item: any) => ({
-      productId: item.product_retailer_id,
-      quantity: item.quantity,
-      price: item.item_price,
-    }));
 
     const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
 
@@ -92,15 +122,14 @@ export class WhatsAppWebhookController {
     console.log('Order created, awaiting email:', { customerPhone, totalAmount });
 
     // Ask for email
-    const whatsappService = new WhatsAppService();
     const emailRequestMessage = `
-✅ Order Received! 
-Order Number: ${createdOrder.orderNumber}
-Total Amount: ₦${totalAmount.toLocaleString()}
+      ✅ Order Received! 
+      Order Number: ${createdOrder.orderNumber}
+      Total Amount: ₦${totalAmount.toLocaleString()}
 
-📧 Please reply with your email address to receive your receipt and invoice.
+      📧 Please reply with your email address to receive your receipt and invoice.
 
-Or type SKIP if you don't want to provide an email.
+      Or type SKIP if you don't want to provide an email.
     `.trim();
 
     await whatsappService.sendMessage(customerPhone, emailRequestMessage);
@@ -175,13 +204,13 @@ Or type SKIP if you don't want to provide an email.
 
     // Send payment link
     const paymentMessage = `
-✅ Thank you! 
-Order Number: ${order.orderNumber}
-Total Amount: ₦${order.totalAmount.toLocaleString()}
+      ✅ Thank you! 
+      Order Number: ${order.orderNumber}
+      Total Amount: ₦${order.totalAmount.toLocaleString()}
 
-Click here to pay: ${payment.authorization_url}
+      Click here to pay: ${payment.authorization_url}
 
-Payment options: Card, Bank Transfer, USSD
+      Payment options: Card, Bank Transfer, USSD
     `.trim();
 
     await whatsappService.sendMessage(customerPhone, paymentMessage);
