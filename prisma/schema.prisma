@@ -245,6 +245,7 @@ model CustomerOrder {
   pendingEmailCollection Boolean @default(false)
 
   invoice         Invoice?
+  paymentExpiresAt    DateTime?
   
   @@map("customer_orders")
 }

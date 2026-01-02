@@ -71,6 +71,8 @@ export class OrderService {
     items: any[],
     totalAmount: number
   ) {
+    const paymentExpiresAt = new Date(Date.now() + 30 * 60 * 1000)
+
     const order = await prisma.customerOrder.create({
       data: {
         customerPhone,
@@ -81,6 +83,7 @@ export class OrderService {
         emailCollectionStatus: 'PENDING',
         paymentStatus: 'PENDING',
         status: 'PENDING',
+        paymentExpiresAt,
         items: {
           create: items.map((item) => ({
             productId: item.productId,

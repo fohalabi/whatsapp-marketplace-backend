@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { OrderService } from '../services/customerOrder.service';
 import { WhatsAppService } from '../services/whatsapp.service';
 import { InvoiceService } from '../services/invoice.service';
+import path from 'path';
 
 const orderService = new OrderService();
 const whatsappService = new WhatsAppService();
@@ -43,41 +44,46 @@ export class PaystackWebhookController {
 
   private async handleSuccessfulPayment(data: any) {
     const reference = data.reference;
-    const amountPaid = data.amount / 100; // Convert from kobo
+    const amountPaid = data.amount / 100;
 
-    // Update order status
     await orderService.updatePaymentStatus(reference, 'PAID');
 
-    // Get order details
     const order = await orderService.getOrderByReference(reference);
-
     if (!order) return;
 
     // Generate invoice
     const { invoice, pdfPath } = await invoiceService.createInvoice(order.id);
 
-    console.log('Invoice generated:', { invoiceNumber: invoice.invoiceNumber, pdfPath });
+    // Get PDF public URL
+    const fileName = path.basename(pdfPath);
+    const pdfUrl = `${process.env.BACKEND_URL}/invoices/${fileName}`;
 
-    // Send confirmation to customer
+    // Send invoice via WhatsApp
+    await whatsappService.sendDocument(
+      order.customerPhone,
+      pdfUrl,
+      `✅ Payment Confirmed! Invoice #${invoice.invoiceNumber}`,
+      `${invoice.invoiceNumber}.pdf`
+    );
+
+    // Send confirmation message
     const confirmationMessage = `
-    ✅ Payment Confirmed!
-    Order Number: ${order.orderNumber}
-    Invoice Number: ${invoice.invoiceNumber}
-    Amount Paid: ₦${amountPaid.toLocaleString()}
+  ✅ Payment Confirmed!
+  Order Number: ${order.orderNumber}
+  Invoice Number: ${invoice.invoiceNumber}
+  Amount Paid: ₦${amountPaid.toLocaleString()}
 
-    Your invoice has been generated. Your order is being processed.
+  Your order is being processed. We'll notify you when it's ready for delivery.
 
-    We'll notify you when it's ready for delivery. 🎉
+  Thank you for your purchase! 🎉
     `.trim();
 
     await whatsappService.sendMessage(order.customerPhone, confirmationMessage);
 
-    // TODO: Send PDF invoice via WhatsApp
+    console.log('Payment confirmed and invoice sent:', { reference, amountPaid });
+  }
 
-    console.log('Payment confirmed:', { reference, amountPaid });
-    }
-
-    private async handleFailedPayment(data: any) {
+  private async handleFailedPayment(data: any) {
     const reference = data.reference;
 
     // Update order status
