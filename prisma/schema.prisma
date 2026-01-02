@@ -129,7 +129,9 @@ model Product {
   whatsappSyncStatus      SyncStatus @default(NOT_SYNCED)
   lastSyncedAt            DateTime?
 
-  orderItems      OrderItem[]
+  orderItems            OrderItem[]
+  customerOrderItems    CustomerOrderItem[]    @relation("ProductToCustomerOrderItem")
+  cartItems             CartItem[]               @relation("ProductToCartItem")
 
   @@map("products")
 }
@@ -224,6 +226,61 @@ model CustomerMessage {
   @@map("customer_message")
 }
 
+model CustomerOrder {
+  id              String              @id @default(cuid())
+  orderNumber     String              @unique @default(cuid())
+  customerPhone   String
+  customerName    String?
+  customerEmail   String?             // Add email for Paystack
+  totalAmount     Float
+  status          CustomerOrderStatus @default(PENDING)
+  paymentStatus   PaymentStatus       @default(PENDING)
+  paymentReference String?            @unique // Paystack reference
+  paymentProof    String?
+  items           CustomerOrderItem[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  @@map("customer_orders")
+}
+
+model CustomerOrderItem {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation("ProductToCustomerOrderItem", fields: [productId], references: [id])
+  quantity        Int
+  price           Float
+  
+  @@map("customer_order_items")
+}
+
+model Cart {
+  id            String    @id @default(cuid())
+  customerPhone String
+  items         CartItem[]
+  status        CartStatus    @default(ACTIVE)
+  expiresAt     DateTime   // Auto Expires after ceratin time
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@map("carts")
+  @@index([customerPhone, status])
+}
+
+model CartItem {
+  id          String   @id @default(cuid())
+  cartId      String
+  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation("ProductToCartItem", fields: [productId], references: [id])
+  quantity    Int
+  addedAt     DateTime @default(now())
+  
+  @@map("cart_items")
+}
+
 enum Role {
   ADMIN
   MERCHANT
@@ -255,4 +312,27 @@ enum SyncStatus {
   NOT_SYNCED
   SYNCED
   FAILED
+}
+
+enum CustomerOrderStatus {
+  PENDING
+  PAYMENT_PENDING
+  PAID 
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum CartStatus {
+  ACTIVE
+  ABANDONED
+  CONVERTED
+  EXPIRED
 }
