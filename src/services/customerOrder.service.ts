@@ -65,4 +65,64 @@ export class OrderService {
       },
     });
   }
+
+  async createPendingOrder(
+    customerPhone: string,
+    items: any[],
+    totalAmount: number
+  ) {
+    const order = await prisma.customerOrder.create({
+      data: {
+        customerPhone,
+        customerEmail: '',
+        totalAmount,
+        paymentReference: `ORDER_${Date.now()}`,
+        pendingEmailCollection: true,
+        emailCollectionStatus: 'PENDING',
+        paymentStatus: 'PENDING',
+        status: 'PENDING',
+        items: {
+          create: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+        },
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    return order;
+  }
+
+  async updateEmailAndProceed(orderNumber: string, email: string, skipped: boolean) {
+    return await prisma.customerOrder.update({
+      where: { orderNumber },
+      data: {
+        customerEmail: skipped ? `noreply-${Date.now()}@yourdomain.com` : email,
+        pendingEmailCollection: false,
+        emailCollectionStatus: skipped ? 'SKIPPED' : 'COLLECTED',
+      },
+    });
+  }
+
+  async getPendingEmailOrder(customerPhone: string) {
+    return await prisma.customerOrder.findFirst({
+      where: {
+        customerPhone,
+        pendingEmailCollection: true,
+      },
+      include: {
+        items: {
+          include: { product: true },
+        },
+      },
+    });
+  }
 }

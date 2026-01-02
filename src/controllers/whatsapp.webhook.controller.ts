@@ -55,6 +55,24 @@ export class WhatsAppWebhookController {
     const customerPhone = orderData.from;
     const order = orderData.order;
 
+    // Check if customer has existing pending order
+    const existingPendingOrder = await prisma.customerOrder.findFirst({
+      where: {
+        customerPhone,
+        paymentStatus: 'PENDING',
+      },
+    });
+
+    if (existingPendingOrder) {
+      const whatsappService = new WhatsAppService();
+      await whatsappService.sendMessage(
+        customerPhone,
+        `⚠️ You already have a pending order (${existingPendingOrder.orderNumber}).
+        Please complete payment for that order first before placing a new one.`
+      );
+      return;
+    }
+
     // Extract order items
     const items = order.product_items.map((item: any) => ({
       productId: item.product_retailer_id,
@@ -64,43 +82,28 @@ export class WhatsAppWebhookController {
 
     const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
 
-    // Generate payment reference
-    const paymentReference = `ORDER_${Date.now()}`;
-    
-    // Customer email (you can ask for this or use a default)
-    const customerEmail = `${customerPhone}@customer.com`;
-
-    // Create order in database
-    const createdOrder = await this.orderService.createOrder(
-      customerPhone, 
-      customerEmail,
-      items, 
-      totalAmount,
-      paymentReference
+    // Create pending order (waiting for email)
+    const createdOrder = await this.orderService.createPendingOrder(
+      customerPhone,
+      items,
+      totalAmount
     );
 
-    // Initialize Paystack payment
-    const payment = await this.paystackService.initializePayment(
-      customerEmail,
-      totalAmount,
-      paymentReference
-    );
+    console.log('Order created, awaiting email:', { customerPhone, totalAmount });
 
-    console.log('Order created:', { customerPhone, totalAmount });
-
-    // Send payment link
+    // Ask for email
     const whatsappService = new WhatsAppService();
-    const paymentMessage = `
+    const emailRequestMessage = `
 ✅ Order Received! 
 Order Number: ${createdOrder.orderNumber}
 Total Amount: ₦${totalAmount.toLocaleString()}
 
-Click here to pay: ${payment.authorization_url}
+📧 Please reply with your email address to receive your receipt and invoice.
 
-Payment options: Card, Bank Transfer, USSD
+Or type SKIP if you don't want to provide an email.
     `.trim();
 
-    await whatsappService.sendMessage(customerPhone, paymentMessage);
+    await whatsappService.sendMessage(customerPhone, emailRequestMessage);
   }
 
   private async handleTextMessage(body: any) {
@@ -108,15 +111,79 @@ Payment options: Card, Bank Transfer, USSD
     const from = message.from;
     const text = message.text?.body || '';
 
-    // Save to admin chat
-    await prisma.customerMessage.create({
-      data: {
-        messageId: message.id,
-        from,
-        message: text,
-      },
-    });
+    // Check if user has pending email collection
+    const pendingOrder = await this.orderService.getPendingEmailOrder(from);
 
-    console.log('Message saved:', { from, text });
+    if (pendingOrder) {
+      // User is responding with email or SKIP
+      await this.handleEmailResponse(from, text, pendingOrder);
+    } else {
+      // Regular message - save to admin chat
+      await prisma.customerMessage.create({
+        data: {
+          messageId: message.id,
+          from,
+          message: text,
+        },
+      });
+
+      console.log('Message saved:', { from, text });
+    }
+  }
+
+  private async handleEmailResponse(customerPhone: string, text: string, order: any) {
+    const whatsappService = new WhatsAppService();
+
+    // Check if user typed SKIP
+    if (text.toUpperCase().trim() === 'SKIP') {
+      // Update order with generated email
+      await this.orderService.updateEmailAndProceed(order.orderNumber, '', true);
+      
+      // Proceed to payment
+      await this.sendPaymentLink(customerPhone, order, `noreply-${Date.now()}@yourdomain.com`);
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(text.trim())) {
+      await whatsappService.sendMessage(
+        customerPhone,
+        '❌ Invalid email format. Please send a valid email address or type SKIP.'
+      );
+      return;
+    }
+
+    // Update order with collected email
+    await this.orderService.updateEmailAndProceed(order.orderNumber, text.trim(), false);
+
+    // Proceed to payment
+    await this.sendPaymentLink(customerPhone, order, text.trim());
+  }
+
+  private async sendPaymentLink(customerPhone: string, order: any, email: string) {
+    const whatsappService = new WhatsAppService();
+
+    // Initialize Paystack payment
+    const payment = await this.paystackService.initializePayment(
+      email,
+      order.totalAmount,
+      order.paymentReference
+    );
+
+    console.log('Payment link generated:', { customerPhone, email });
+
+    // Send payment link
+    const paymentMessage = `
+✅ Thank you! 
+Order Number: ${order.orderNumber}
+Total Amount: ₦${order.totalAmount.toLocaleString()}
+
+Click here to pay: ${payment.authorization_url}
+
+Payment options: Card, Bank Transfer, USSD
+    `.trim();
+
+    await whatsappService.sendMessage(customerPhone, paymentMessage);
   }
 }

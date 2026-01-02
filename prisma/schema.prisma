@@ -243,6 +243,8 @@ model CustomerOrder {
 
   emailCollectionStatus String? // 'PENDING', 'COLLECTED', 'SKIPPED'
   pendingEmailCollection Boolean @default(false)
+
+  invoice         Invoice?
   
   @@map("customer_orders")
 }
@@ -282,6 +284,15 @@ model CartItem {
   addedAt     DateTime @default(now())
   
   @@map("cart_items")
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  orderId         String   @unique
+  order           CustomerOrder @relation(fields: [orderId], references: [id])
+  pdfUrl          String?
+  createdAt       DateTime @default(now())
 }
 
 enum Role {
