@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { getIO } from '../config/socket';
 
 export class OrderService {
   async createOrder(
@@ -8,12 +9,15 @@ export class OrderService {
     totalAmount: number,
     paymentReference: string
   ) {
+    const orderNumber = await this.generateOrderNumber();
+
     const order = await prisma.customerOrder.create({
       data: {
         customerPhone,
         customerEmail,
         totalAmount,
         paymentReference,
+        orderNumber,
         items: {
           create: items.map((item) => ({
             productId: item.productId,
@@ -72,9 +76,11 @@ export class OrderService {
     totalAmount: number
   ) {
     const paymentExpiresAt = new Date(Date.now() + 30 * 60 * 1000)
+    const orderNumber = await this.generateOrderNumber();
 
     const order = await prisma.customerOrder.create({
       data: {
+        orderNumber,
         customerPhone,
         customerEmail: '',
         totalAmount,
@@ -127,5 +133,67 @@ export class OrderService {
         },
       },
     });
+  }
+
+  async generateOrderNumber(): Promise<string> {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    const prefix = `ORD-${year}${month}${day}`;
+
+    // Count orders today
+    const count = await prisma.customerOrder.count({
+      where: {
+        orderNumber: {
+          startsWith: prefix,
+        },
+      },
+    });
+
+    const nextNumber = (count + 1).toString().padStart(4, '0');
+    return `${prefix}-${nextNumber}`;
+  }
+
+  async reduceStock(orderId: string) {
+    const order = await prisma.customerOrder.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) return;
+
+    const updatedProducts = [];
+
+    // Reduce stock for each item
+    for (const item of order.items) {
+      const updatedProduct = await prisma.product.update({
+        where: { id: item.productId },
+        data: {
+          stockQuantity: {
+            decrement: item.quantity,
+          },
+        },
+      });
+      
+      updatedProducts.push(updatedProduct);
+    }
+
+    // Emit socket event to all connected clients
+    try {
+      const io = getIO();
+      io.emit('stock-updated', {
+        products: updatedProducts.map(p => ({
+          id: p.id,
+          stockQuantity: p.stockQuantity,
+        })),
+      });
+      console.log('Stock update emitted via WebSocket');
+    } catch (error) {
+      console.error('Socket emit error:', error);
+    }
+
+    console.log('Stock reduced for order:', order.orderNumber);
   }
 }

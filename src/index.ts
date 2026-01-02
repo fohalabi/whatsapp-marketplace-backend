@@ -1,6 +1,9 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { initializeSocket } from './config/socket';
+import { startPaymentTimeoutJob } from './jobs/payment.timeout.job';
 import authRoutes from './routes/auth.routes';
 import testRoutes from './routes/test.routes';
 import teamRoutes from './routes/team.routes';
@@ -15,21 +18,26 @@ import whatsappRoutes from './routes/whatsapp.routes';
 import teamManagementRoutes from './routes/teamManagement.routes';
 import whatsappWebhookRoutes from './routes/whatsapp.webhook.routes';
 import paystackWebhookRoutes from './routes/paystack.webhook.routes';
+import invoiceRoutes from './routes/invoice.routes';
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Initialize Socket.io
+initializeSocket(server);
 
 app.use(cors());
 app.use(express.json());
 
-// serve uploadd files
+// Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 
-app.use('/api/paystack', paystackWebhookRoutes)
+// Routes
+app.use('/api/paystack', paystackWebhookRoutes);
 app.use('/api/whatsapp', whatsappWebhookRoutes);
-
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/merchant', merchantRoutes);
@@ -41,14 +49,14 @@ app.use('/api/admin/merchants', adminMerchantRoutes);
 app.use('/api/admin/products', adminProductRoute);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/admin/team', teamManagementRoutes);
-
-
+app.use('/api', invoiceRoutes);
 app.use('/api/test', testRoutes);
 
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+  res.json({ status: 'ok' });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  startPaymentTimeoutJob();
 });

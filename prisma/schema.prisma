@@ -228,7 +228,7 @@ model CustomerMessage {
 
 model CustomerOrder {
   id              String              @id @default(cuid())
-  orderNumber     String              @unique @default(cuid())
+  orderNumber     String              @unique
   customerPhone   String
   customerName    String?
   customerEmail   String?             // Add email for Paystack

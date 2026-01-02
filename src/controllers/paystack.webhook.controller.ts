@@ -51,6 +51,9 @@ export class PaystackWebhookController {
     const order = await orderService.getOrderByReference(reference);
     if (!order) return;
 
+    // Reduce stock
+    await orderService.reduceStock(order.id);
+
     // Generate invoice
     const { invoice, pdfPath } = await invoiceService.createInvoice(order.id);
 
