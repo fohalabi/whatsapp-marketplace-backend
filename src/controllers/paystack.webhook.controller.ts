@@ -5,6 +5,7 @@ import { WhatsAppService } from '../services/whatsapp.service';
 import { InvoiceService } from '../services/invoice.service';
 import path from 'path';
 import { getRedis } from '../config/redis';
+import prisma from '../config/database';
 
 const orderService = new OrderService();
 const whatsappService = new WhatsAppService();
@@ -65,6 +66,16 @@ export class PaystackWebhookController {
 
     const order = await orderService.getOrderByReference(reference);
     if (!order) return;
+
+    // Escrow entry
+    await prisma.escrow.create({
+      data: {
+        orderId: order.id,
+        merchantId: order.merchantId,
+        amount: order.totalAmount,
+        status: 'HELD',
+      },
+    }),
 
     // Reduce stock
     await orderService.reduceStock(order.id);

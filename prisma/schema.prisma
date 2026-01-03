@@ -235,6 +235,7 @@ model CustomerOrder {
   customerPhone   String
   customerName    String?
   customerEmail   String?             // Add email for Paystack
+  merchantId      String
   totalAmount     Float
   status          CustomerOrderStatus @default(PENDING)
   paymentStatus   PaymentStatus       @default(PENDING)
@@ -256,6 +257,9 @@ model CustomerOrder {
   refundAmount        Float?
   refundedAt          DateTime?
   refundNotes         String?
+
+  escrow              Escrow?
+  payouts             Payout[]
   
   @@map("customer_orders")
 }
@@ -356,6 +360,38 @@ model Message {
   @@index([messageHash])
 }
 
+model Escrow {
+  id              String        @id @default(cuid())
+  orderId         String        @unique
+  order           CustomerOrder @relation(fields: [orderId], references: [id])
+  merchantId      String
+  amount          Float
+  status          EscrowStatus  @default(HELD)
+  heldAt          DateTime      @default(now())
+  releasedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("escrow")
+  @@index([merchantId, status])
+}
+
+model Payout {
+  id              String        @id @default(cuid())
+  merchantId      String
+  orderId         String
+  order           CustomerOrder @relation(fields: [orderId], references: [id])
+  amount          Float
+  status          PayoutStatus  @default(PENDING)
+  availableAt     DateTime      @default(now())
+  paidOutAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("payouts")
+  @@index([merchantId, status])
+}
+
 enum Role {
   ADMIN
   MERCHANT
@@ -418,4 +454,15 @@ enum RefundStatus {
   APPROVED
   REJECTED
   REFUNDED
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
+}
+
+enum PayoutStatus {
+  PENDING
+  COMPLETED
 }

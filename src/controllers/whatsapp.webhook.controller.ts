@@ -112,11 +112,19 @@ export class WhatsAppWebhookController {
 
     const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
 
+    // get merchantId from the first product
+    const firstProduct = await prisma.product.findUnique({
+      where: { id: items[0].productId },
+    });
+
+    const merchantId = firstProduct!.merchantId;
+
     // Create pending order (waiting for email)
     const createdOrder = await this.orderService.createPendingOrder(
       customerPhone,
       items,
-      totalAmount
+      totalAmount,
+      merchantId
     );
 
     console.log('Order created, awaiting email:', { customerPhone, totalAmount });

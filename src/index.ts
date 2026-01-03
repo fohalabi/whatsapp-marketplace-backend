@@ -20,6 +20,8 @@ import whatsappWebhookRoutes from './routes/whatsapp.webhook.routes';
 import paystackWebhookRoutes from './routes/paystack.webhook.routes';
 import refundRoutes from './routes/refund.routes';
 import abandonedOrderRoutes from './routes/abandonedOrder.routes';
+import escrowRoutes from './routes/escrow.routes';
+import payoutRoutes from './routes/payout.routes';
 
 dotenv.config();
 
@@ -52,6 +54,8 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/admin/team', teamManagementRoutes);
 app.use('/api/admin/refunds', refundRoutes);
 app.use('/api/admin/abandoned-orders', abandonedOrderRoutes);
+app.use('/api/escrow', escrowRoutes);
+app.use('/api/payouts', payoutRoutes);
 
 app.use('/api/test', testRoutes);
 

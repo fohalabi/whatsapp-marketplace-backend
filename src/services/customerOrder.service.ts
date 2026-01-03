@@ -1,13 +1,21 @@
 import prisma from '../config/database';
 import { getIO } from '../config/socket';
+import { EscrowService } from './escrow.service';
 
 export class OrderService {
+  private escrowService: EscrowService;
+
+  constructor() {
+    this.escrowService = new EscrowService();
+  }
+
   async createOrder(
     customerPhone: string, 
     customerEmail: string,
     items: any[], 
     totalAmount: number,
-    paymentReference: string
+    paymentReference: string,
+    merchantId: string
   ) {
     const orderNumber = await this.generateOrderNumber();
 
@@ -18,6 +26,7 @@ export class OrderService {
         totalAmount,
         paymentReference,
         orderNumber,
+        merchantId,
         items: {
           create: items.map((item) => ({
             productId: item.productId,
@@ -73,7 +82,8 @@ export class OrderService {
   async createPendingOrder(
     customerPhone: string,
     items: any[],
-    totalAmount: number
+    totalAmount: number,
+    merchantId: string
   ) {
     const paymentExpiresAt = new Date(Date.now() + 30 * 60 * 1000)
     const orderNumber = await this.generateOrderNumber();
@@ -84,6 +94,7 @@ export class OrderService {
         customerPhone,
         customerEmail: '',
         totalAmount,
+        merchantId,
         paymentReference: `ORDER_${Date.now()}`,
         pendingEmailCollection: true,
         emailCollectionStatus: 'PENDING',
@@ -195,5 +206,20 @@ export class OrderService {
     }
 
     console.log('Stock reduced for order:', order.orderNumber);
+  }
+
+  async updateOrderStatus(orderId: string, status: any) {
+    const order = await prisma.customerOrder.update({
+      where: { id: orderId },
+      data: { status },
+    });
+
+    // If order delivered, release escrow
+    if (status === 'DELIVERED') {
+      await this.escrowService.releaseEscrowToPayout(orderId);
+      console.log('Order delivered, escrow released:', orderId);
+    }
+
+    return order;
   }
 }
