@@ -74,4 +74,30 @@ export class ReportController {
       });
     }
   }
+
+  async exportCSV(req: AuthRequest, res: Response) {
+    try {
+        const { period } = req.query;
+
+        if (!period || !['daily', 'weekly', 'monthly'].includes(period as string)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid period. Use: daily, weekly, or monthly',
+        });
+        }
+
+        const csv = await reportService.generateCSV(
+        period as 'daily' | 'weekly' | 'monthly'
+        );
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=report-${period}-${Date.now()}.csv`);
+        res.send(csv);
+    } catch (error: any) {
+        res.status(500).json({
+        success: false,
+        message: error.message,
+        });
+    }
+  }
 }

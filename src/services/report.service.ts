@@ -117,4 +117,27 @@ export class ReportService {
       monthly,
     };
   }
+
+  async generateCSV(period: 'daily' | 'weekly' | 'monthly') {
+        const summary = await this.getFinancialSummary(period);
+        const merchants = await this.getMerchantPerformance(period);
+
+        // Build CSV content
+        let csv = 'Financial Summary\n';
+        csv += 'Metric,Value\n';
+        csv += `GMV,${summary.gmv}\n`;
+        csv += `Platform Revenue,${summary.platformRevenue}\n`;
+        csv += `Total Payouts,${summary.totalPayouts}\n`;
+        csv += `Orders Count,${summary.ordersCount}\n`;
+        csv += `Delivery Costs,${summary.deliveryCosts}\n`;
+        csv += `Taxes Collected,${summary.taxesCollected}\n\n`;
+
+        csv += 'Merchant Performance\n';
+        csv += 'Merchant,GMV,Orders,Platform Revenue\n';
+        merchants.forEach(m => {
+            csv += `${m.merchantName},${m.gmv},${m.ordersCount},${m.platformRevenue}\n`;
+        });
+
+        return csv;
+    }
 }

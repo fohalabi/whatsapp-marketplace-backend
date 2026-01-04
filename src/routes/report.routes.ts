@@ -8,5 +8,6 @@ const reportController = new ReportController();
 router.get('/summary', authenticate, (req, res) => reportController.getFinancialSummary(req, res));
 router.get('/merchants', authenticate, (req, res) => reportController.getMerchantPerformance(req, res));
 router.get('/comparison', authenticate, (req, res) => reportController.getReportComparison(req, res));
+router.get('/export/csv', authenticate, (req, res) => reportController.exportCSV(req, res));
 
 export default router;
