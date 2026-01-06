@@ -23,6 +23,8 @@ import abandonedOrderRoutes from './routes/abandonedOrder.routes';
 import escrowRoutes from './routes/escrow.routes';
 import payoutRoutes from './routes/payout.routes';
 import reportRoutes from './routes/report.routes';
+import riderRoutes from './routes/rider.routes';
+import deliveryRoutes from './routes/delivery.routes';
 
 dotenv.config();
 
@@ -58,6 +60,8 @@ app.use('/api/admin/abandoned-orders', abandonedOrderRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('api/reports', reportRoutes);
+app.use('/api/rider', riderRoutes);
+app.use('/api/deliveries', deliveryRoutes);
 
 app.use('/api/test', testRoutes);
 

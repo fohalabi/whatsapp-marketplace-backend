@@ -51,6 +51,8 @@ model Merchant {
   businessName         String
   category             String
   location             String
+  latitude             Float?
+  longitude            Float?
   phone                String
   profilePictureUrl    String?
   verificationStatus   VerificationStatus @default(PENDING)
