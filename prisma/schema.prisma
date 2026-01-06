@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url     = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,151 +21,157 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  inviteToken         String?   @unique
-  inviteTokenExpiry   DateTime?
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
 
   // Two-factor authentication fields
-  twoFactorEnabled    Boolean  @default(false)
-  twoFactorSecret     String?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
 
-  merchant      Merchant?
-  preferences   UserPreferences?
-  activityLogs  ActivityLog[]
+  merchant     Merchant?
+  preferences  UserPreferences?
+  activityLogs ActivityLog[]
+
+  // Conversations assigned to this user for handling
+  assignedConversations Conversation[] @relation("AssignedConversations")
+  messages              Message[]
 
   @@map("users")
 }
 
 model Merchant {
-  id                   String             @id @default(cuid())
-  userId               String             @unique
-  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade) 
-  businessName         String
-  category             String
-  location             String
-  phone                String
-  profilePictureUrl    String?
-  verificationStatus   VerificationStatus @default(PENDING)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName       String
+  category           String
+  location           String
+  phone              String
+  profilePictureUrl  String?
+  verificationStatus VerificationStatus @default(PENDING)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
-  verification         MerchantVerification?
+  verification MerchantVerification?
 
-  products             Product[]
-  orders               Order[]
+  products Product[]
+  orders   Order[]
 
   @@map("merchants")
 }
 
 model MerchantVerification {
-  id                    String             @id @default(cuid())
-  merchantId            String             @unique
-  merchant              Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
-  governmentIdUrl       String
-  businessLicenseUrl    String?
-  productSampleUrl      String
-  businessAddress       String
-  registrationNumber    String?
-  
-  status                VerificationStatus @default(PENDING)
-  
+  id         String   @id @default(cuid())
+  merchantId String   @unique
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  governmentIdUrl    String
+  businessLicenseUrl String?
+  productSampleUrl   String
+  businessAddress    String
+  registrationNumber String?
+
+  status VerificationStatus @default(PENDING)
+
   idVerificationStatus       VerificationStatus @default(PENDING)
   locationVerificationStatus VerificationStatus @default(PENDING)
   productSampleStatus        VerificationStatus @default(PENDING)
-  
-  businessLicenseStatus      VerificationStatus?
-  registrationNumberStatus   VerificationStatus?
-  
-  idVerifiedAt               DateTime?
-  locationVerifiedAt         DateTime?
-  productSampleVerifiedAt    DateTime?
-  businessLicenseVerifiedAt  DateTime?
+
+  businessLicenseStatus    VerificationStatus?
+  registrationNumberStatus VerificationStatus?
+
+  idVerifiedAt                 DateTime?
+  locationVerifiedAt           DateTime?
+  productSampleVerifiedAt      DateTime?
+  businessLicenseVerifiedAt    DateTime?
   registrationNumberVerifiedAt DateTime?
-  
-  idRejectionReason          String?
-  locationRejectionReason    String?
-  productRejectionReason     String?
-  businessLicenseRejectionReason String?
+
+  idRejectionReason                 String?
+  locationRejectionReason           String?
+  productRejectionReason            String?
+  businessLicenseRejectionReason    String?
   registrationNumberRejectionReason String?
-  
-  rejectionReason       String?
-  submittedAt           DateTime           @default(now())
-  reviewedAt            DateTime?
-  reviewedBy            String?
-  
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+
+  rejectionReason String?
+  submittedAt     DateTime  @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("merchant_verifications")
 }
 
 model Product {
-  id              String            @id @default(cuid())
-  merchantId      String
-  merchant        Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
-  name            String
-  description     String
-  category        String
-  price           Float
-  stockQuantity   Int
-  unit            String
-  minOrderQty     Int
-  
-  images          String[]
-  variants        Json?
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
-  markup          Float? @default(0)
-  retailPrice     Float?
-  
-  approvalStatus  ApprovalStatus    @default(PENDING)
+  name          String
+  description   String
+  category      String
+  price         Float
+  stockQuantity Int
+  unit          String
+  minOrderQty   Int
+
+  images   String[]
+  variants Json?
+
+  markup      Float? @default(0)
+  retailPrice Float?
+
+  approvalStatus  ApprovalStatus @default(PENDING)
   rejectionReason String?
-  isActive        Boolean           @default(true)
-  
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  isActive        Boolean        @default(true)
 
-  whatsappProductId       String?
-  whatsappSyncStatus      SyncStatus @default(NOT_SYNCED)
-  lastSyncedAt            DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  orderItems            OrderItem[]
-  customerOrderItems    CustomerOrderItem[]    @relation("ProductToCustomerOrderItem")
-  cartItems             CartItem[]               @relation("ProductToCartItem")
+  whatsappProductId  String?
+  whatsappSyncStatus SyncStatus @default(NOT_SYNCED)
+  lastSyncedAt       DateTime?
+
+  orderItems         OrderItem[]
+  customerOrderItems CustomerOrderItem[] @relation("ProductToCustomerOrderItem")
+  cartItems          CartItem[]          @relation("ProductToCartItem")
 
   @@map("products")
 }
 
 model Order {
-  id              String        @id @default(cuid())
-  merchantId      String
-  merchant        Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
-  orderItems      OrderItem[]
-  
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  orderItems OrderItem[]
+
   totalAmount     Float
-  status          OrderStatus   @default(PENDING)
+  status          OrderStatus @default(PENDING)
   pickupTime      DateTime
   orderNotes      String?
   rejectionReason String?
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  customerId      String?
+  customer        Customer?   @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("orders")
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  
-  quantity    Int
-  price       Float
-  
-  createdAt   DateTime @default(now())
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Int
+  price    Float
+
+  createdAt DateTime @default(now())
 
   @@map("order_items")
 }
@@ -178,107 +184,477 @@ model StockUpdateNotification {
   oldStock    Int
   newStock    Int
   isRecieved  Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@map("stock_update_notifications")
 }
 
 model UserPreferences {
-  id                  String  @id @default(cuid())
-  userId              String  @unique
-  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  emailNotifications  Boolean @default(true)
-  pushNotifications   Boolean @default(false)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(false)
   // theme               String  @default("light")
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("user_preferences")
 }
 
 model ActivityLog {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   action      String
   description String?
   ipAddress   String?
   userAgent   String?
-  
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("activity_logs")
+}
+
+model Customer {
+  id String @id @default(cuid())
+
+  // WhatsApp Info
+  whatsappId     String? @unique
+  phone          String  @unique
+  phoneHash      String  @unique
+  profileName    String?
+  profilePicture String?
+
+  // Contact Info
+  name        String?
+  email       String?   @unique
+  country     String?   @default("NG")
+  city        String?
+  state       String?
+  address     String?
+  gender      String?   @default("unknown")
+  dateOfBirth DateTime?
+
+  // Business Info (if they're a business)
+  isBusiness       Boolean @default(false)
+  businessName     String?
+  businessCategory String?
+  businessAddress  String?
+  businessEmail    String?
+  businessWebsite  String?
+
+  // Customer Metrics
+  totalOrders      Int       @default(0)
+  totalSpent       Decimal   @default(0)
+  avgOrderValue    Decimal   @default(0)
+  lastOrderDate    DateTime?
+  firstOrderDate   DateTime?
+  orderCount30Days Int       @default(0)
+  spent30Days      Decimal   @default(0)
+
+  // WhatsApp Stats
+  totalMessages      Int       @default(0)
+  incomingMessages   Int       @default(0)
+  outgoingMessages   Int       @default(0)
+  lastMessageDate    DateTime?
+  firstMessageDate   DateTime?
+  messageCount30Days Int       @default(0)
+  responseTimeAvg    Int? // Average response time in seconds
+
+  // Customer Status & Classification
+  status        CustomerStatus @default(ACTIVE)
+  customerType  CustomerType   @default(REGULAR)
+  customerTier  CustomerTier   @default(BRONZE)
+  loyaltyPoints Int            @default(0)
+
+  // Tags & Metadata
+  tags   String[] @default([])
+  source String   @default("whatsapp")
+  notes  String?
+
+  // Preferences
+  whatsappOptIn  Boolean @default(true)
+  marketingOptIn Boolean @default(false)
+  emailOptIn     Boolean @default(false)
+  language       String  @default("en")
+
+  // Contact Status
+  isBlocked  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  lastActive DateTime @default(now())
+
+  // Relationships
+  conversations Conversation[]
+  orders        Order[]
+  notesHistory  CustomerNote[]
+  activities    CustomerActivity[]
+
+  // Timestamps
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastSynced DateTime? // Last sync with WhatsApp
+
+  @@index([phone])
+  @@index([email])
+  @@index([status])
+  @@index([customerType])
+  @@index([customerTier])
+  @@index([totalSpent])
+  @@index([lastActive])
+  @@index([createdAt])
+  @@map("customers")
+}
+
+// Related models
+model CustomerNote {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  note       String
+  createdBy  String // Admin ID or system
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([customerId])
+  @@map("customer_notes")
+}
+
+model CustomerActivity {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  activity    String // 'message_sent', 'order_placed', 'profile_updated', etc.
+  description String?
+  metadata    Json?
   createdAt   DateTime @default(now())
 
-  @@map("activity_logs")
-  @@index([userId, createdAt])
+  @@index([customerId])
+  @@index([activity])
+  @@index([createdAt])
+  @@map("customer_activities")
+}
+
+model Conversation {
+  id                String    @id @default(cuid())
+  customerPhone     String // Masked version: +234801****78
+  customerPhoneHash String    @unique // Hashed for searching
+  customerName      String?
+  lastMessage       String?   @default("[Encrypted]")
+  lastMessageAt     DateTime  @default(now())
+  unreadCount       Int       @default(0)
+  status            String    @default("active") // active, resolved, archived
+  tags              String[]  @default([])
+  assignedTo        String? // User ID
+  assignedAdmin     User?     @relation("AssignedConversations", fields: [assignedTo], references: [id])
+  messages          Message[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Customer Link
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([status])
+  @@index([assignedTo])
+  @@index([lastMessageAt])
+  @@index([customerPhoneHash])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String? // User ID for admin messages
+  sender         User?        @relation(fields: [senderId], references: [id])
+  senderType     String // customer, admin, bot
+  content        String       @default("[Encrypted]") // Placeholder text
+
+  // Encryption fields
+  encryptedContent  String? @db.Text
+  encryptionIv      String?
+  encryptionAuthTag String?
+  messageHash       String? @unique // For deduplication
+
+  messageType       String   @default("text") // text, image, document, interactive, template
+  whatsappMessageId String?  @unique
+  status            String   @default("sent") // sent, delivered, read, failed
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderType])
+  @@index([whatsappMessageId])
+  @@index([status])
+  @@index([messageHash])
 }
 
 model CustomerMessage {
-  id              String    @id @default(cuid())
-  messageId       String    @unique //whatsapp message 
-  from            String    // customer phone number
-  message         String    @db.Text
-  timestamp       DateTime  @default(now())
-  isRead          Boolean   @default(false)
-  createdAt       DateTime  @default(now())
+  id        String   @id @default(cuid())
+  messageId String   @unique //whatsapp message 
+  from      String // customer phone number
+  message   String   @db.Text
+  timestamp DateTime @default(now())
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@map("customer_message")
 }
 
 model CustomerOrder {
-  id              String              @id @default(cuid())
-  orderNumber     String              @unique @default(cuid())
-  customerPhone   String
-  customerName    String?
-  customerEmail   String?             // Add email for Paystack
-  totalAmount     Float
-  status          CustomerOrderStatus @default(PENDING)
-  paymentStatus   PaymentStatus       @default(PENDING)
-  paymentReference String?            @unique // Paystack reference
-  paymentProof    String?
-  items           CustomerOrderItem[]
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  
+  id               String              @id @default(cuid())
+  orderNumber      String              @unique @default(cuid())
+  customerPhone    String
+  customerName     String?
+  customerEmail    String? // Add email for Paystack
+  totalAmount      Float
+  status           CustomerOrderStatus @default(PENDING)
+  paymentStatus    PaymentStatus       @default(PENDING)
+  paymentReference String?             @unique // Paystack reference
+  paymentProof     String?
+  items            CustomerOrderItem[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
   @@map("customer_orders")
 }
 
 model CustomerOrderItem {
-  id              String        @id @default(cuid())
-  orderId         String
-  order           CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId       String
-  product         Product       @relation("ProductToCustomerOrderItem", fields: [productId], references: [id])
-  quantity        Int
-  price           Float
-  
+  id        String        @id @default(cuid())
+  orderId   String
+  order     CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product       @relation("ProductToCustomerOrderItem", fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+
   @@map("customer_order_items")
 }
 
 model Cart {
-  id            String    @id @default(cuid())
+  id            String     @id @default(cuid())
   customerPhone String
   items         CartItem[]
-  status        CartStatus    @default(ACTIVE)
-  expiresAt     DateTime   // Auto Expires after ceratin time
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  
-  @@map("carts")
+  status        CartStatus @default(ACTIVE)
+  expiresAt     DateTime // Auto Expires after ceratin time
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
   @@index([customerPhone, status])
+  @@map("carts")
 }
 
 model CartItem {
-  id          String   @id @default(cuid())
-  cartId      String
-  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation("ProductToCartItem", fields: [productId], references: [id])
-  quantity    Int
-  addedAt     DateTime @default(now())
-  
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation("ProductToCartItem", fields: [productId], references: [id])
+  quantity  Int
+  addedAt   DateTime @default(now())
+
   @@map("cart_items")
+}
+
+// Segment model (if you don't have it already)
+model Segment {
+  id             String        @id @default(uuid())
+  name           String        @unique
+  description    String?
+  criteria       Json          // Segment criteria
+  tags           String[]
+  color          String        @default("purple")
+  customerCount  Int           @default(0)
+  purchaseBehavior Json?       // Behavioral data
+  
+  // Relationships
+  createdBy      User          @relation(fields: [createdById], references: [id])
+  createdById    String
+  broadcasts     Broadcast[]
+  
+  // Timestamps
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  isDeleted      Boolean       @default(false)
+}
+
+// schema.prisma - Broadcast & Template Models
+model Broadcast {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  
+  // Message content
+  content       String   // The actual message to send
+  templateId    String?  // Link to WhatsApp template if approved
+  
+  // Target segment
+  segmentId     String?  // Which segment to send to
+  customFilter  Json?    // Custom criteria if not using segment
+  
+  // Recipients
+  totalRecipients     Int      @default(0)
+  successfulSends     Int      @default(0)
+  failedSends         Int      @default(0)
+  
+  // Scheduling
+  scheduledFor  DateTime?  // When to send (null = send now)
+  sentAt        DateTime?  // When actually sent
+  
+  // Status
+  status        BroadcastStatus @default(DRAFT)
+  approvalStatus ApprovalStatus @default(PENDING)
+  
+  // WhatsApp-specific
+  whatsappTemplateName String?  // Approved WhatsApp template name
+  whatsappTemplateId   String?  // WhatsApp's template ID
+  
+  // Relations
+  createdBy     String   @db.ObjectId
+  creator       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  
+  segment       Segment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Analytics
+  openRate      Float?   @default(0)
+  clickRate     Float?   @default(0)
+  conversionRate Float?  @default(0)
+  
+  @@index([createdBy])
+  @@index([segmentId])
+  @@index([status])
+  @@index([approvalStatus])
+  @@index([scheduledFor])
+}
+
+model BroadcastTemplate {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  category      TemplateCategory @default(PROMOTION)
+  
+  // Template content
+  header        String?   // WhatsApp template header
+  body          String    // WhatsApp template body (required)
+  footer        String?   // WhatsApp template footer
+  
+  // Variables for dynamic content
+  variables     String[]  // e.g., ["customer_name", "order_id", "amount"]
+  
+  // Approval workflow
+  approvalStatus ApprovalStatus @default(PENDING)
+  rejectionReason String?       // If rejected
+  
+  // WhatsApp-specific
+  whatsappTemplateId   String?    // Once approved by WhatsApp
+  whatsappTemplateName String?    // Name in WhatsApp Business
+  languageCode         String    @default("en_US")
+  
+  // Sample data for preview
+  sampleData    Json?     // { "customer_name": "John Doe", "order_id": "123" }
+  
+  // Relations
+  createdBy     String   @db.ObjectId
+  creator       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  
+  // Status tracking
+  submittedAt   DateTime?  // When submitted for WhatsApp approval
+  approvedAt    DateTime?  // When approved by WhatsApp
+  rejectedAt    DateTime?  // When rejected by WhatsApp
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Usage stats
+  usedCount     Int      @default(0)
+  lastUsed      DateTime?
+  
+  @@index([createdBy])
+  @@index([approvalStatus])
+  @@index([category])
+}
+
+model BroadcastRecipient {
+  id            String   @id @default(cuid())
+  
+  // Relations
+  broadcastId   String   @db.ObjectId
+  broadcast     Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  
+  customerPhone String   // Hashed phone number
+  customer      Customer? @relation(fields: [customerPhone], references: [phoneHash], onDelete: SetNull)
+  
+  // Status
+  status        RecipientStatus @default(PENDING)
+  whatsappMessageId String?     // WhatsApp's message ID
+  
+  // Tracking
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  failedAt      DateTime?
+  failureReason String?
+  
+  // Analytics
+  opened        Boolean  @default(false)
+  clicked       Boolean  @default(false)
+  converted     Boolean  @default(false)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([broadcastId, customerPhone])
+  @@index([broadcastId])
+  @@index([customerPhone])
+  @@index([status])
+}
+
+// Enums
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+enum ApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum TemplateCategory {
+  PROMOTION
+  ALERT
+  UPDATE
+  WELCOME
+  VERIFICATION
+  UTILITY
+  TRANSACTIONAL
+}
+
+enum RecipientStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  OPTED_OUT
 }
 
 enum Role {
@@ -317,7 +693,7 @@ enum SyncStatus {
 enum CustomerOrderStatus {
   PENDING
   PAYMENT_PENDING
-  PAID 
+  PAID
   PROCESSING
   SHIPPED
   DELIVERED
@@ -335,4 +711,28 @@ enum CartStatus {
   ABANDONED
   CONVERTED
   EXPIRED
+}
+
+// Enums
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  ARCHIVED
+}
+
+enum CustomerType {
+  REGULAR
+  VIP
+  PREMIUM
+  WHOLESALE
+  BUSINESS
+}
+
+enum CustomerTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
 }
