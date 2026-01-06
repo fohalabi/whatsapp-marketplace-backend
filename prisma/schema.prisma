@@ -39,6 +39,8 @@ model User {
   broadcastTemplates BroadcastTemplate[] 
   segments Segment[]  
 
+  rider       Rider?
+
   @@map("users")
 }
 
@@ -268,6 +270,7 @@ model CustomerOrder {
 
   escrow              Escrow?
   payouts             Payout[]
+  delivery            Delivery?
   
   @@map("customer_orders")
 }
@@ -700,11 +703,93 @@ model Segment {
   isDeleted Boolean @default(false)
 }
 
+model Rider {
+  id                String       @id @default(cuid())
+  userId            String       @unique
+  user              User         @relation(fields: [userId], references: [id])
+  
+  firstName         String
+  lastName          String
+  phone             String       @unique
+  email             String       @unique
+  
+  vehicleType       String
+  vehicleNumber     String?
+  licensePlate      String?
+  
+  status            RiderStatus  @default(OFFLINE)
+  currentLatitude   Float?
+  currentLongitude  Float?
+  
+  rating            Float        @default(0)
+  totalDeliveries   Int          @default(0)
+  
+  deliveries        Delivery[]
+  
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  @@map("riders")
+}
+
+model Delivery {
+  id                String          @id @default(cuid())
+  deliveryNumber    String          @unique
+  
+  orderId           String          @unique
+  order             CustomerOrder   @relation(fields: [orderId], references: [id])
+  
+  provider          DeliveryProvider
+  riderId           String?
+  rider             Rider?          @relation(fields: [riderId], references: [id])
+  
+  status            DeliveryStatus  @default(PENDING)
+  pickupAddress     String
+  pickupLatitude    Float
+  pickupLongitude   Float
+  deliveryAddress   String
+  deliveryLatitude  Float
+  deliveryLongitude Float
+  
+  recipientName     String
+  recipientPhone    String
+  
+  proofOfDeliveryImage String?
+  deliveryNotes     String?
+  
+  assignedAt        DateTime?
+  pickedUpAt        DateTime?
+  deliveredAt       DateTime?
+  
+  deliveryFee       Float?
+  
+  events            DeliveryEvent[]
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@map("deliveries")
+}
+
+model DeliveryEvent {
+  id          String          @id @default(cuid())
+  deliveryId  String
+  delivery    Delivery        @relation(fields: [deliveryId], references: [id])
+  
+  status      DeliveryStatus
+  description String?
+  
+  createdAt   DateTime        @default(now())
+  
+  @@map("delivery_events")
+}
+
 enum Role {
   ADMIN
   MERCHANT
   MANAGER
   SUPPORT
+  RIDER
 }
 
 enum VerificationStatus {
@@ -839,4 +924,26 @@ enum CustomerTier { 
   GOLD  
   PLATINUM  
   DIAMOND
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum DeliveryProvider {
+  IN_HOUSE
+  GIG_LOGISTICS
+  DHL
+}
+
+enum RiderStatus {
+  OFFLINE
+  AVAILABLE
+  BUSY
 }
