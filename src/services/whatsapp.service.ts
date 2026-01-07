@@ -1608,18 +1608,6 @@ export class WhatsAppService {
       return { data: [] };
     }
   }
-
-  async getBusinessProfile(): Promise<any> {
-    try {
-      const url = `${this.phoneId}/whatsapp_business_profile`;
-      const response = await this.axiosInstance.get(url);
-      return response.data;
-    } catch (error: any) {
-      console.error('Get business profile error:', error.response?.data || error.message);
-      throw error;
-    }
-  }
-
   getStatus() {
     const now = Math.floor(Date.now() / 1000);
     const daysUntilExpiry = this.tokenInfo.expiresAt ?
