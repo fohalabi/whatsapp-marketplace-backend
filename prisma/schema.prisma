@@ -28,13 +28,16 @@ model User {
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
 
-  merchant     Merchant?
-  preferences  UserPreferences?
-  activityLogs ActivityLog[]
+  merchant      Merchant?
+  preferences   UserPreferences?
+  activityLogs  ActivityLog[]
+  sentMessages  Message[]
 
-  // Conversations assigned to this user for handling
-  assignedConversations Conversation[] @relation("AssignedConversations")
-  messages              Message[]
+  assignedConversations   Conversation[]  @relation("AssignedConversations")
+
+  broadcasts Broadcast[]  
+  broadcastTemplates BroadcastTemplate[] 
+  segments Segment[]  
 
   @@map("users")
 }
@@ -54,8 +57,9 @@ model Merchant {
 
   verification MerchantVerification?
 
-  products Product[]
-  orders   Order[]
+  products             Product[]
+  orders               Order[]
+  wallet               MerchantWallet?
 
   @@map("merchants")
 }
@@ -152,11 +156,12 @@ model Order {
   pickupTime      DateTime
   orderNotes      String?
   rejectionReason String?
-  customerId      String?
-  customer        Customer?   @relation(fields: [customerId], references: [id])
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  customer Customer @relation(fields: [customerId], references: [id])
+  customerId String
 
   @@map("orders")
 }
@@ -406,20 +411,37 @@ model CustomerMessage {
 }
 
 model CustomerOrder {
-  id               String              @id @default(cuid())
-  orderNumber      String              @unique @default(cuid())
-  customerPhone    String
-  customerName     String?
-  customerEmail    String? // Add email for Paystack
-  totalAmount      Float
-  status           CustomerOrderStatus @default(PENDING)
-  paymentStatus    PaymentStatus       @default(PENDING)
-  paymentReference String?             @unique // Paystack reference
-  paymentProof     String?
-  items            CustomerOrderItem[]
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  id              String              @id @default(cuid())
+  orderNumber     String              @unique
+  customerPhone   String
+  customerName    String?
+  customerEmail   String?             // Add email for Paystack
+  merchantId      String
+  totalAmount     Float
+  status          CustomerOrderStatus @default(PENDING)
+  paymentStatus   PaymentStatus       @default(PENDING)
+  paymentReference String?            @unique // Paystack reference
+  paymentProof    String?
+  items           CustomerOrderItem[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
+  emailCollectionStatus String? // 'PENDING', 'COLLECTED', 'SKIPPED'
+  pendingEmailCollection Boolean @default(false)
+
+  invoice         Invoice?
+  paymentExpiresAt    DateTime?
+
+  refundStatus        RefundStatus   @default(NONE)
+  refundReason        String?
+  refundRequestedAt   DateTime?
+  refundAmount        Float?
+  refundedAt          DateTime?
+  refundNotes         String?
+
+  escrow              Escrow?
+  payouts             Payout[]
+  
   @@map("customer_orders")
 }
 
@@ -460,73 +482,298 @@ model CartItem {
   @@map("cart_items")
 }
 
-// Segment model (if you don't have it already)
-model Segment {
-  id             String        @id @default(uuid())
-  name           String        @unique
-  description    String?
-  criteria       Json          // Segment criteria
-  tags           String[]
-  color          String        @default("purple")
-  customerCount  Int           @default(0)
-  purchaseBehavior Json?       // Behavioral data
-  
-  // Relationships
-  createdBy      User          @relation(fields: [createdById], references: [id])
-  createdById    String
-  broadcasts     Broadcast[]
-  
-  // Timestamps
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  isDeleted      Boolean       @default(false)
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  orderId         String   @unique
+  order           CustomerOrder @relation(fields: [orderId], references: [id])
+  pdfUrl          String?
+  createdAt       DateTime @default(now())
 }
 
-// schema.prisma - Broadcast & Template Models
+model Conversation {
+  id                String @id @default(cuid())
+  customerPhone     String // Masked version: +234801****78
+  customerPhoneHash String @unique // Hashed for searching
+  customerName      String?
+  lastMessage       String? @default("[Encrypted]")
+  lastMessageAt     DateTime @default(now())
+  unreadCount       Int @default(0)
+  status            String @default("active") // active, resolved, archived
+  tags              String[] @default([])
+  assignedTo        String? // User ID
+  assignedAdmin     User? @relation("AssignedConversations", fields: [assignedTo], references: [id])
+  messages          Message[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  customerId String
+
+  @@index([status])
+  @@index([assignedTo])
+  @@index([lastMessageAt])
+  @@index([customerPhoneHash])
+}
+
+model Message {
+  id                  String @id @default(cuid())
+  conversationId      String
+  conversation        Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId            String? // User ID for admin messages
+  sender              User? @relation(fields: [senderId], references: [id])
+  senderType          String // customer, admin, bot
+  content             String @default("[Encrypted]") // Placeholder text
+  
+  // Encryption fields
+  encryptedContent        String? @db.Text
+  encryptionIv            String?
+  encryptionAuthTag       String?
+  messageHash             String? @unique // For deduplication
+  
+  messageType             String @default("text") // text, image, document, interactive, template
+  whatsappMessageId       String? @unique
+  status                  String @default("sent") // sent, delivered, read, failed
+  metadata                Json?
+  createdAt               DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderType])
+  @@index([whatsappMessageId])
+  @@index([status])
+  @@index([messageHash])
+}
+
+model Escrow {
+  id              String        @id @default(cuid())
+  orderId         String        @unique
+  order           CustomerOrder @relation(fields: [orderId], references: [id])
+  merchantId      String
+  amount          Float
+  status          EscrowStatus  @default(HELD)
+  heldAt          DateTime      @default(now())
+  releasedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("escrow")
+  @@index([merchantId, status])
+}
+
+model Payout {
+  id              String        @id @default(cuid())
+  merchantId      String
+  orderId         String
+  order           CustomerOrder @relation(fields: [orderId], references: [id])
+  amount          Float
+  status          PayoutStatus  @default(PENDING)
+  availableAt     DateTime      @default(now())
+  paidOutAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("payouts")
+  @@index([merchantId, status])
+}
+
+model Customer {  
+  id                String @id @default(cuid())    
+  
+  whatsappId        String? @unique  
+  phone             String @unique  
+  phoneHash         String @unique  
+  profileName       String?  
+  profilePicture    String?    
+  
+  // Contact Info  
+  name              String?  
+  email             String? @unique  
+  country           String? @default("NG")  
+  city              String?  
+  state             String?  
+  address           String?  
+  gender            String? @default("unknown")  
+  dateOfBirth       DateTime?    
+  
+  // Business Info (if they're a business)  
+  isBusiness          Boolean @default(false)  
+  businessName        String?  
+  businessCategory    String?  
+  businessAddress     String?  
+  businessEmail       String?  
+  businessWebsite     String?    
+  
+  // Customer Metrics  
+  totalOrders       Int @default(0)  
+  totalSpent        Decimal @default(0)  
+  avgOrderValue     Decimal @default(0)  
+  lastOrderDate     DateTime?  
+  firstOrderDate    DateTime?  
+  orderCount30Days  Int @default(0)  
+  spent30Days       Decimal @default(0)    
+  
+  // WhatsApp Stats  
+  totalMessages           Int @default(0)  
+  incomingMessages        Int @default(0)  
+  outgoingMessages        Int @default(0)  
+  lastMessageDate         DateTime?  
+  firstMessageDate        DateTime?  
+  messageCount30Days      Int @default(0)  
+  responseTimeAvg         Int? // Average response time in seconds    
+
+  // Customer Status & Classification  
+  status                CustomerStatus @default(ACTIVE)  
+  customerType          CustomerType @default(REGULAR)  
+  customerTier          CustomerTier @default(BRONZE)  
+  loyaltyPoints         Int @default(0)    
+  
+  // Tags & Metadata  
+  tags        String[] @default([])  
+  source      String @default("whatsapp")  
+  notes       String?    
+  
+  // Preferences 
+  whatsappOptIn       Boolean @default(true)  
+  marketingOptIn      Boolean @default(false)  
+  emailOptIn          Boolean @default(false)  
+  language            String @default("en")    
+   
+  // Contact Status  
+  isBlocked         Boolean @default(false)  
+  isArchived        Boolean @default(false)  
+  lastActive        DateTime @default(now())    
+  
+  // Relationships  
+  conversations     Conversation[]  
+  orders            Order[]  
+  notesHistory      CustomerNote[]  
+  activities        CustomerActivity[]    
+  
+  // Timestamps  
+  createdAt         DateTime @default(now())  
+  updatedAt         DateTime @updatedAt  
+  lastSynced        DateTime? // Last sync with WhatsApp  
+  
+  broadcastRecipients BroadcastRecipient[]  
+  
+  @@map("customers")  
+  @@index([phone])  
+  @@index([email])  
+  @@index([status])  
+  @@index([customerType])  
+  @@index([customerTier])  
+  @@index([totalSpent])  
+  @@index([lastActive])  
+  @@index([createdAt])
+
+}
+
+model CustomerNote {  
+  id                  String @id @default(cuid())  
+  customerId          String  
+  customer            Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)  
+  note                String  
+  createdBy           String // Admin ID or system  
+  createdAt           DateTime @default(now())  
+  updatedAt           DateTime @updatedAt    
+  
+  @@map("customer_notes")  
+  @@index([customerId])
+}
+
+model CustomerActivity {  
+  id              String @id @default(cuid())  
+  customerId      String  
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)  
+  activity        String // 'message_sent', 'order_placed', 'profile_updated', etc.  
+  description     String?  
+  metadata        Json?  
+  createdAt       DateTime @default(now())    
+  
+  @@map("customer_activities")  
+  @@index([customerId])  
+  @@index([activity])  
+  @@index([createdAt])
+}
+
+model MerchantWallet {
+  id              String              @id @default(cuid())
+  merchantId      String              @unique
+  merchant        Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  balance         Float               @default(0)
+  totalEarnings   Float               @default(0)
+  totalWithdrawals Float              @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  transactions    WalletTransaction[]
+
+  @@map("merchant_wallets")
+}
+
+model WalletTransaction {
+  id              String        @id @default(cuid())
+  walletId        String
+  wallet          MerchantWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type            TransactionType
+  amount          Float
+  balanceAfter    Float
+  orderId         String?
+  reference       String        @unique
+  description     String
+  createdAt       DateTime      @default(now())
+
+  @@map("wallet_transactions")
+  @@index([walletId, createdAt])
+}
+
+model PlatformWallet {
+  id                  String   @id @default(cuid())
+  totalRevenue        Float    @default(0)
+  totalPayouts        Float    @default(0)
+  currentBalance      Float    @default(0)
+  updatedAt           DateTime @updatedAt
+
+  @@map("platform_wallet")
+}
+
 model Broadcast {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
+  id String @id @default(cuid())
+  name String
+  description String?
   
-  // Message content
-  content       String   // The actual message to send
-  templateId    String?  // Link to WhatsApp template if approved
+  content String 
+  templateId String? 
   
-  // Target segment
-  segmentId     String?  // Which segment to send to
-  customFilter  Json?    // Custom criteria if not using segment
+  segmentId String?
+  customFilter Json? 
   
-  // Recipients
-  totalRecipients     Int      @default(0)
-  successfulSends     Int      @default(0)
-  failedSends         Int      @default(0)
+  totalRecipients Int @default(0)
+  successfulSends Int @default(0)
+  failedSends Int @default(0)
   
-  // Scheduling
-  scheduledFor  DateTime?  // When to send (null = send now)
-  sentAt        DateTime?  // When actually sent
+  scheduledFor DateTime?
+  sentAt DateTime? 
   
-  // Status
-  status        BroadcastStatus @default(DRAFT)
+  status BroadcastStatus @default(DRAFT)
   approvalStatus ApprovalStatus @default(PENDING)
   
-  // WhatsApp-specific
-  whatsappTemplateName String?  // Approved WhatsApp template name
-  whatsappTemplateId   String?  // WhatsApp's template ID
+  whatsappTemplateName String? 
+  whatsappTemplateId String? 
   
-  // Relations
-  createdBy     String   @db.ObjectId
-  creator       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  createdBy String
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   
-  segment       Segment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  segment Segment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
   
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
-  // Analytics
-  openRate      Float?   @default(0)
-  clickRate     Float?   @default(0)
-  conversionRate Float?  @default(0)
+  openRate Float? @default(0)
+  clickRate Float? @default(0)
+  conversionRate Float? @default(0)
+
+  recipients BroadcastRecipient[]
   
   @@index([createdBy])
   @@index([segmentId])
@@ -536,47 +783,38 @@ model Broadcast {
 }
 
 model BroadcastTemplate {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
-  category      TemplateCategory @default(PROMOTION)
+  id String @id @default(cuid())
+  name String
+  description String?
+  category TemplateCategory @default(PROMOTION)
   
-  // Template content
-  header        String?   // WhatsApp template header
-  body          String    // WhatsApp template body (required)
-  footer        String?   // WhatsApp template footer
+  header String? 
+  body String 
+  footer String? 
   
-  // Variables for dynamic content
-  variables     String[]  // e.g., ["customer_name", "order_id", "amount"]
+  variables String[] 
   
-  // Approval workflow
   approvalStatus ApprovalStatus @default(PENDING)
-  rejectionReason String?       // If rejected
+  rejectionReason String? 
   
-  // WhatsApp-specific
-  whatsappTemplateId   String?    // Once approved by WhatsApp
-  whatsappTemplateName String?    // Name in WhatsApp Business
-  languageCode         String    @default("en_US")
+  whatsappTemplateId String? 
+  whatsappTemplateName String? 
+  languageCode String @default("en_US")
   
-  // Sample data for preview
-  sampleData    Json?     // { "customer_name": "John Doe", "order_id": "123" }
+  sampleData Json? 
+
+  createdBy String
+  creator User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   
-  // Relations
-  createdBy     String   @db.ObjectId
-  creator       User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  submittedAt DateTime? 
+  approvedAt DateTime? 
+  rejectedAt DateTime? 
   
-  // Status tracking
-  submittedAt   DateTime?  // When submitted for WhatsApp approval
-  approvedAt    DateTime?  // When approved by WhatsApp
-  rejectedAt    DateTime?  // When rejected by WhatsApp
-  
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  // Usage stats
-  usedCount     Int      @default(0)
-  lastUsed      DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usedCount Int @default(0)
+  lastUsed DateTime?
   
   @@index([createdBy])
   @@index([approvalStatus])
@@ -584,34 +822,29 @@ model BroadcastTemplate {
 }
 
 model BroadcastRecipient {
-  id            String   @id @default(cuid())
+  id String @id @default(cuid())
   
-  // Relations
-  broadcastId   String   @db.ObjectId
-  broadcast     Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  broadcastId String 
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
   
-  customerPhone String   // Hashed phone number
-  customer      Customer? @relation(fields: [customerPhone], references: [phoneHash], onDelete: SetNull)
+  customerPhone String // Hashed phone number
+  customer Customer? @relation(fields: [customerPhone], references: [phoneHash], onDelete: SetNull)
+
+  status RecipientStatus @default(PENDING)
+  whatsappMessageId String? 
   
-  // Status
-  status        RecipientStatus @default(PENDING)
-  whatsappMessageId String?     // WhatsApp's message ID
-  
-  // Tracking
-  sentAt        DateTime?
-  deliveredAt   DateTime?
-  readAt        DateTime?
-  failedAt      DateTime?
+  sentAt DateTime?
+  deliveredAt DateTime?
+  readAt DateTime?
+  failedAt DateTime?
   failureReason String?
   
-  // Analytics
-  opened        Boolean  @default(false)
-  clicked       Boolean  @default(false)
-  converted     Boolean  @default(false)
-  
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  opened Boolean @default(false)
+  clicked Boolean @default(false)
+  converted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
   @@unique([broadcastId, customerPhone])
   @@index([broadcastId])
@@ -619,42 +852,25 @@ model BroadcastRecipient {
   @@index([status])
 }
 
-// Enums
-enum BroadcastStatus {
-  DRAFT
-  SCHEDULED
-  SENDING
-  SENT
-  CANCELLED
-  FAILED
-}
-
-enum ApprovalStatus {
-  DRAFT
-  PENDING
-  APPROVED
-  REJECTED
-  EXPIRED
-}
-
-enum TemplateCategory {
-  PROMOTION
-  ALERT
-  UPDATE
-  WELCOME
-  VERIFICATION
-  UTILITY
-  TRANSACTIONAL
-}
-
-enum RecipientStatus {
-  PENDING
-  SENDING
-  SENT
-  DELIVERED
-  READ
-  FAILED
-  OPTED_OUT
+model Segment {
+  id String @id @default(cuid())
+  name String @unique
+  description String?
+  criteria Json // Segment criteria
+  tags String[]
+  color String @default("purple")
+  customerCount Int @default(0)
+  purchaseBehavior Json? // Behavioral data
+  
+  // Relationships
+  createdBy User @relation(fields: [createdById], references: [id])
+  createdById String
+  broadcasts Broadcast[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean @default(false)
 }
 
 enum Role {
@@ -713,26 +929,87 @@ enum CartStatus {
   EXPIRED
 }
 
-// Enums
-enum CustomerStatus {
-  ACTIVE
-  INACTIVE
-  BLOCKED
+enum RefundStatus {
+  NONE 
+  REQUESTED
+  APPROVED
+  REJECTED
+  REFUNDED
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
+}
+
+enum PayoutStatus {
+  PENDING
+  COMPLETED
+}
+
+enum TransactionType {
+  CREDIT      // Money added to wallet
+  DEBIT       // Money withdrawn from wallet
+  WITHDRAWAL  // Merchant withdrawal
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+enum ApproveStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum TemplateCategory {
+  PROMOTION
+  ALERT
+  UPDATE
+  WELCOME
+  VERIFICATION
+  UTILITY
+  TRANSACTIONAL
+}
+
+enum RecipientStatus {
+  PENDING
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  OPTED_OUT
+}
+
+enum CustomerStatus {  
+  ACTIVE  
+  INACTIVE  
+  BLOCKED  
   ARCHIVED
 }
 
-enum CustomerType {
-  REGULAR
-  VIP
-  PREMIUM
-  WHOLESALE
+enum CustomerType {  
+  REGULAR  
+  VIP  
+  PREMIUM  
+  WHOLESALE  
   BUSINESS
 }
 
-enum CustomerTier {
-  BRONZE
-  SILVER
-  GOLD
-  PLATINUM
+enum CustomerTier {  
+  BRONZE  
+  SILVER  
+  GOLD  
+  PLATINUM  
   DIAMOND
 }

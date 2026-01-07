@@ -51,9 +51,12 @@
 // });
 
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
+import { initializeSocket } from './config/socket';
+import { startPaymentTimeoutJob } from './jobs/payment.timeout.job';
 import authRoutes from './routes/auth.routes';
 import testRoutes from './routes/test.routes';
 import teamRoutes from './routes/team.routes';
@@ -67,15 +70,22 @@ import adminProductRoute from './routes/admin.products.routes';
 import whatsappRoutes from './routes/whatsapp.routes';
 import teamManagementRoutes from './routes/teamManagement.routes';
 import whatsappWebhookRoutes from './routes/whatsapp.webhook.routes';
+import paystackWebhookRoutes from './routes/paystack.webhook.routes';
+import refundRoutes from './routes/refund.routes';
+import abandonedOrderRoutes from './routes/abandonedOrder.routes';
+import escrowRoutes from './routes/escrow.routes';
+import payoutRoutes from './routes/payout.routes';
+import reportRoutes from './routes/report.routes';
 import broadcastRoutes from './routes/broadcast.routes';
-
-// Import your SocketManager
-import { initializeSocket } from './config/socket';
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Initialize Socket.io
+initializeSocket(server);
 
 // Create HTTP server for Socket.IO
 const httpServer = createServer(app);
@@ -103,6 +113,9 @@ app.use('/uploads', express.static('uploads'));
 
 // Routes - MAKE SURE ALL ROUTES START WITH A LEADING SLASH
 app.use('/api/whatsapp-webhook', whatsappWebhookRoutes); // Fixed: added leading slash and specific path
+// Routes
+app.use('/api/paystack', paystackWebhookRoutes);
+app.use('/api/whatsapp', whatsappWebhookRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/merchant', merchantRoutes);
@@ -115,6 +128,12 @@ app.use('/api/admin/products', adminProductRoute);
 app.use('/api/whatsapp', whatsappRoutes); // Regular WhatsApp routes
 app.use('/api/admin/team', teamManagementRoutes);
 app.use('/api/admin/broadcast', broadcastRoutes);
+app.use('/api/admin/refunds', refundRoutes);
+app.use('/api/admin/abandoned-orders', abandonedOrderRoutes);
+app.use('/api/escrow', escrowRoutes);
+app.use('/api/payouts', payoutRoutes);
+app.use('api/reports', reportRoutes);
+
 app.use('/api/test', testRoutes);
 
 // Health check endpoint

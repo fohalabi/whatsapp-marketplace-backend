@@ -45,4 +45,27 @@ export class PaystackService {
       throw error;
     }
   }
+
+  async refundPayment(reference: string, amount?: number) {
+    try {
+      const response = await axios.post(
+        'https://api.paystack.co/refund',
+        {
+          transaction: reference,
+          amount: amount ? amount * 100 : undefined,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error('Paystack refund error:', error.response?.data);
+      throw error;
+    }
+  }
 }
