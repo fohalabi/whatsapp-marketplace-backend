@@ -6,5 +6,6 @@ const authController = new AuthController();
 
 router.post('/register', (req, res) => authController.register(req, res));
 router.post('/login', (req, res) => authController.login(req, res));
+router.post('/rider/register', (req, res) => authController.riderRegister(req, res));
 
 export default router;
