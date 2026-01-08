@@ -3,8 +3,6 @@ import { AuthRequest } from '../types/auth.types';
 import { whatsappService } from '../services/whatsapp.service';
 
 export class WhatsAppController {
-  // ========== WHATSAPP MESSAGE ENDPOINTS ==========
-
   async sendMessage(req: AuthRequest, res: Response) {
     try {
       const { to, message, type = 'text', templateName, buttons, previewUrl = false } = req.body;
@@ -161,8 +159,6 @@ export class WhatsAppController {
       });
     }
   }
-
-  // ========== WHATSAPP CONTACTS ENDPOINTS ==========
 
   async getRegisteredContacts(req: Request, res: Response) {
     try {
@@ -487,8 +483,6 @@ export class WhatsAppController {
     }
   }
 
-  // ========== PRODUCT CATALOG ENDPOINTS ==========
-
   async syncProductToCatalog(req: AuthRequest, res: Response) {
     try {
       const product = req.body;
@@ -628,6 +622,14 @@ export class WhatsAppController {
   async getConversation(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
+
       const conversation = await whatsappService.getConversation(id);
 
       res.json({
@@ -647,6 +649,14 @@ export class WhatsAppController {
   async getConversationByPhone(req: Request, res: Response) {
     try {
       const { phone } = req.params;
+
+      if (!phone) {
+        return res.status(400).json({
+          success: false,
+          error: 'Phone number is required'
+        });
+      }
+
       const conversation = await whatsappService.getConversationByPhone(phone);
 
       res.json({
@@ -691,6 +701,13 @@ export class WhatsAppController {
       const { id } = req.params;
       const { limit = '50', before } = req.query;
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
+
       const messages = await whatsappService.getDecryptedMessages(id, 
         parseInt(limit as string),
         before ? new Date(before as string) : undefined
@@ -714,6 +731,13 @@ export class WhatsAppController {
     try {
       const { id } = req.params;
       const { tags, status, assignedTo, customerName } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
 
       const updateData: any = {};
       if (tags) updateData.tags = tags;
@@ -752,6 +776,13 @@ export class WhatsAppController {
         });
       }
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
+
       const conversation = await prisma.conversation.update({
         where: { id },
         data: { assignedTo: adminId, updatedAt: new Date() }
@@ -775,6 +806,13 @@ export class WhatsAppController {
     try {
       const { id } = req.params;
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
+
       const conversation = await prisma.conversation.update({
         where: { id },
         data: { status: 'resolved', updatedAt: new Date() }
@@ -797,6 +835,13 @@ export class WhatsAppController {
   async markMessagesAsRead(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
 
       const conversation = await whatsappService.getConversation(id);
       
@@ -833,6 +878,13 @@ export class WhatsAppController {
       const { customerPhones, message, templateName } = req.body;
       const adminId = req.user?.id;
 
+       if (!adminId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized - admin ID required'
+        });
+      }
+
       if (!customerPhones || !customerPhones.length || (!message && !templateName)) {
         return res.status(400).json({
           success: false,
@@ -866,6 +918,13 @@ export class WhatsAppController {
       const { id } = req.params;
       const { tags } = req.body;
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
+
       if (!tags || !Array.isArray(tags)) {
         return res.status(400).json({
           success: false,
@@ -896,6 +955,13 @@ export class WhatsAppController {
     try {
       const { id } = req.params;
       const { customerName } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conversation ID is required'
+        });
+      }
 
       if (!customerName) {
         return res.status(400).json({
@@ -961,7 +1027,16 @@ export class WhatsAppController {
 
   async getBusinessProfileInfo(req: Request, res: Response) {
     try {
-      const profile = await whatsappService.getBusinessProfile();
+      const { phoneNumber } = req.query;
+      
+      if (!phoneNumber || typeof phoneNumber !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'Phone number is required'
+        });
+      }
+
+      const profile = await whatsappService.getBusinessProfile(phoneNumber);
 
       res.json({
         success: true,

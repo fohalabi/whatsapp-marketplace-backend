@@ -18,6 +18,12 @@ export interface JWTPayload {
     role: Role;
 }
 
+export interface CustomJWTPayload extends JWTPayload {
+  id: string;
+  email: string;
+  role: Role;
+}
+
 export interface AuthRequest extends Request {
-    user?: JWTPayload;
+  user?: CustomJWTPayload;
 }
