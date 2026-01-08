@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url     = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,12 +21,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  inviteToken         String?   @unique
-  inviteTokenExpiry   DateTime?
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
 
   // Two-factor authentication fields
-  twoFactorEnabled    Boolean  @default(false)
-  twoFactorSecret     String?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
 
   merchant      Merchant?
   preferences   UserPreferences?
@@ -59,7 +59,7 @@ model Merchant {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  verification         MerchantVerification?
+  verification MerchantVerification?
 
   products             Product[]
   orders               Order[]
@@ -69,94 +69,94 @@ model Merchant {
 }
 
 model MerchantVerification {
-  id                    String             @id @default(cuid())
-  merchantId            String             @unique
-  merchant              Merchant           @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
-  governmentIdUrl       String
-  businessLicenseUrl    String?
-  productSampleUrl      String
-  businessAddress       String
-  registrationNumber    String?
-  
-  status                VerificationStatus @default(PENDING)
-  
+  id         String   @id @default(cuid())
+  merchantId String   @unique
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  governmentIdUrl    String
+  businessLicenseUrl String?
+  productSampleUrl   String
+  businessAddress    String
+  registrationNumber String?
+
+  status VerificationStatus @default(PENDING)
+
   idVerificationStatus       VerificationStatus @default(PENDING)
   locationVerificationStatus VerificationStatus @default(PENDING)
   productSampleStatus        VerificationStatus @default(PENDING)
-  
-  businessLicenseStatus      VerificationStatus?
-  registrationNumberStatus   VerificationStatus?
-  
-  idVerifiedAt               DateTime?
-  locationVerifiedAt         DateTime?
-  productSampleVerifiedAt    DateTime?
-  businessLicenseVerifiedAt  DateTime?
+
+  businessLicenseStatus    VerificationStatus?
+  registrationNumberStatus VerificationStatus?
+
+  idVerifiedAt                 DateTime?
+  locationVerifiedAt           DateTime?
+  productSampleVerifiedAt      DateTime?
+  businessLicenseVerifiedAt    DateTime?
   registrationNumberVerifiedAt DateTime?
-  
-  idRejectionReason          String?
-  locationRejectionReason    String?
-  productRejectionReason     String?
-  businessLicenseRejectionReason String?
+
+  idRejectionReason                 String?
+  locationRejectionReason           String?
+  productRejectionReason            String?
+  businessLicenseRejectionReason    String?
   registrationNumberRejectionReason String?
-  
-  rejectionReason       String?
-  submittedAt           DateTime           @default(now())
-  reviewedAt            DateTime?
-  reviewedBy            String?
-  
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+
+  rejectionReason String?
+  submittedAt     DateTime  @default(now())
+  reviewedAt      DateTime?
+  reviewedBy      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("merchant_verifications")
 }
 
 model Product {
-  id              String            @id @default(cuid())
-  merchantId      String
-  merchant        Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
-  name            String
-  description     String
-  category        String
-  price           Float
-  stockQuantity   Int
-  unit            String
-  minOrderQty     Int
-  
-  images          String[]
-  variants        Json?
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
-  markup          Float? @default(0)
-  retailPrice     Float?
-  
-  approvalStatus  ApprovalStatus    @default(PENDING)
+  name          String
+  description   String
+  category      String
+  price         Float
+  stockQuantity Int
+  unit          String
+  minOrderQty   Int
+
+  images   String[]
+  variants Json?
+
+  markup      Float? @default(0)
+  retailPrice Float?
+
+  approvalStatus  ApprovalStatus @default(PENDING)
   rejectionReason String?
-  isActive        Boolean           @default(true)
-  
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  isActive        Boolean        @default(true)
 
-  whatsappProductId       String?
-  whatsappSyncStatus      SyncStatus @default(NOT_SYNCED)
-  lastSyncedAt            DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  orderItems            OrderItem[]
-  customerOrderItems    CustomerOrderItem[]    @relation("ProductToCustomerOrderItem")
-  cartItems             CartItem[]               @relation("ProductToCartItem")
+  whatsappProductId  String?
+  whatsappSyncStatus SyncStatus @default(NOT_SYNCED)
+  lastSyncedAt       DateTime?
+
+  orderItems         OrderItem[]
+  customerOrderItems CustomerOrderItem[] @relation("ProductToCustomerOrderItem")
+  cartItems          CartItem[]          @relation("ProductToCartItem")
 
   @@map("products")
 }
 
 model Order {
-  id              String        @id @default(cuid())
-  merchantId      String
-  merchant        Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  
-  orderItems      OrderItem[]
-  
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  orderItems OrderItem[]
+
   totalAmount     Float
-  status          OrderStatus   @default(PENDING)
+  status          OrderStatus @default(PENDING)
   pickupTime      DateTime
   orderNotes      String?
   rejectionReason String?
@@ -171,16 +171,16 @@ model Order {
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  
-  quantity    Int
-  price       Float
-  
-  createdAt   DateTime @default(now())
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Int
+  price    Float
+
+  createdAt DateTime @default(now())
 
   @@map("order_items")
 }
@@ -193,50 +193,50 @@ model StockUpdateNotification {
   oldStock    Int
   newStock    Int
   isRecieved  Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@map("stock_update_notifications")
 }
 
 model UserPreferences {
-  id                  String  @id @default(cuid())
-  userId              String  @unique
-  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  emailNotifications  Boolean @default(true)
-  pushNotifications   Boolean @default(false)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(false)
   // theme               String  @default("light")
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("user_preferences")
 }
 
 model ActivityLog {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   action      String
   description String?
   ipAddress   String?
   userAgent   String?
-  
-  createdAt   DateTime @default(now())
 
-  @@map("activity_logs")
+  createdAt DateTime @default(now())
+
   @@index([userId, createdAt])
+  @@map("activity_logs")
 }
 
 model CustomerMessage {
-  id              String    @id @default(cuid())
-  messageId       String    @unique //whatsapp message 
-  from            String    // customer phone number
-  message         String    @db.Text
-  timestamp       DateTime  @default(now())
-  isRead          Boolean   @default(false)
-  createdAt       DateTime  @default(now())
+  id        String   @id @default(cuid())
+  messageId String   @unique //whatsapp message 
+  from      String // customer phone number
+  message   String   @db.Text
+  timestamp DateTime @default(now())
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@map("customer_message")
 }
@@ -278,39 +278,39 @@ model CustomerOrder {
 }
 
 model CustomerOrderItem {
-  id              String        @id @default(cuid())
-  orderId         String
-  order           CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId       String
-  product         Product       @relation("ProductToCustomerOrderItem", fields: [productId], references: [id])
-  quantity        Int
-  price           Float
-  
+  id        String        @id @default(cuid())
+  orderId   String
+  order     CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product       @relation("ProductToCustomerOrderItem", fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+
   @@map("customer_order_items")
 }
 
 model Cart {
-  id            String    @id @default(cuid())
+  id            String     @id @default(cuid())
   customerPhone String
   items         CartItem[]
-  status        CartStatus    @default(ACTIVE)
-  expiresAt     DateTime   // Auto Expires after ceratin time
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  
-  @@map("carts")
+  status        CartStatus @default(ACTIVE)
+  expiresAt     DateTime // Auto Expires after ceratin time
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
   @@index([customerPhone, status])
+  @@map("carts")
 }
 
 model CartItem {
-  id          String   @id @default(cuid())
-  cartId      String
-  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation("ProductToCartItem", fields: [productId], references: [id])
-  quantity    Int
-  addedAt     DateTime @default(now())
-  
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation("ProductToCartItem", fields: [productId], references: [id])
+  quantity  Int
+  addedAt   DateTime @default(now())
+
   @@map("cart_items")
 }
 
@@ -823,7 +823,7 @@ enum SyncStatus {
 enum CustomerOrderStatus {
   PENDING
   PAYMENT_PENDING
-  PAID 
+  PAID
   PROCESSING
   SHIPPED
   DELIVERED
