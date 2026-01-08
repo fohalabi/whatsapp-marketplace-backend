@@ -590,8 +590,6 @@ export class WhatsAppController {
     }
   }
 
-  // ========== CHAT CONVERSATION ENDPOINTS ==========
-
   async getConversations(req: Request, res: Response) {
     try {
       const {
@@ -830,8 +828,6 @@ export class WhatsAppController {
     }
   }
 
-  // ========== BROADCAST ENDPOINTS ==========
-
   async sendBroadcast(req: AuthRequest, res: Response) {
     try {
       const { customerPhones, message, templateName } = req.body;
@@ -864,8 +860,6 @@ export class WhatsAppController {
       });
     }
   }
-
-  // ========== TAGS & CUSTOMER MANAGEMENT ==========
 
   async updateTags(req: AuthRequest, res: Response) {
     try {
@@ -928,8 +922,6 @@ export class WhatsAppController {
       });
     }
   }
-
-  // ========== ADMIN & UTILITY ENDPOINTS ==========
 
   async getWhatsAppStatus(req: Request, res: Response) {
     try {
@@ -1023,8 +1015,6 @@ export class WhatsAppController {
       });
     }
   }
-
-  // ========== STATISTICS ENDPOINTS ==========
 
   async getChatStatistics(req: Request, res: Response) {
     try {

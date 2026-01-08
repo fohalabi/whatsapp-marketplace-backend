@@ -11,8 +11,6 @@ import {
 
 export class BroadcastController {
   
-  // ========== TEMPLATE MANAGEMENT ==========
-  
   async createTemplate(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.id;
@@ -177,8 +175,6 @@ export class BroadcastController {
       });
     }
   }
-
-  // ========== BROADCAST MANAGEMENT ==========
 
   async createBroadcast(req: Request, res: Response) {
     try {
@@ -455,9 +451,6 @@ export class BroadcastController {
       });
     }
   }
-  // controllers/broadcast.controller.ts - Add these segment methods
-
-  // ========== SEGMENT MANAGEMENT ==========
 
   async createSegment(req: Request, res: Response) {
     try {

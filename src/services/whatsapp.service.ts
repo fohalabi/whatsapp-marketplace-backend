@@ -14,8 +14,6 @@ import {
 
 dotenv.config();
 
-// ========== EXPANDED INTERFACES ==========
-
 export interface Product {
   id: string;
   name: string;
@@ -82,8 +80,6 @@ interface TokenInfo {
   lastRefreshed: Date;
   isRefreshing: boolean;
 }
-
-// ========== WHATSAPP CONTACTS INTERFACES ==========
 
 export interface WhatsAppContact {
   input: string;
@@ -191,8 +187,6 @@ export class WhatsAppService {
     console.log(`✅ WhatsApp Service initialized for Phone ID: ${this.phoneId}`);
   }
 
-  // ========== WHATSAPP API METHODS ==========
-
   private setupInterceptors() {
     this.axiosInstance.interceptors.response.use(
       (response) => response,
@@ -295,8 +289,6 @@ export class WhatsAppService {
     }
   }
 
-  // ========== WHATSAPP CONTACTS API ==========
-
   /**
    * Get registered contacts from WhatsApp Business account
    */
@@ -393,15 +385,17 @@ export class WhatsAppService {
       const data = response.data;
 
       return {
-        wa_id: formattedPhone,
-        profile_name: data.profile?.name,
-        profile_picture_url: data.profile?.picture?.url,
-        status: data.status?.status,
-        last_seen: data.status?.timestamp ?
-          new Date(parseInt(data.status.timestamp) * 1000) : undefined,
-        is_blocked: data.blocked || false,
-        is_business: !!data.business_profile,
-        business_profile: data.business_profile ? {
+      wa_id: formattedPhone,
+      profile_name: data.profile?.name,
+      profile_picture_url: data.profile?.picture?.url,
+      status: data.status?.status,
+      ...(data.status?.timestamp && {
+        last_seen: new Date(parseInt(data.status.timestamp) * 1000)
+      }),
+      is_blocked: data.blocked || false,
+      is_business: !!data.business_profile,
+      ...(data.business_profile && {
+        business_profile: {
           id: data.business_profile.id,
           name: data.business_profile.name,
           description: data.business_profile.description,
@@ -410,8 +404,9 @@ export class WhatsAppService {
           email: data.business_profile.email,
           websites: data.business_profile.websites,
           profile_picture_url: data.business_profile.profile_picture_url
-        } : undefined
-      };
+        }
+      })
+    };
     } catch (error: any) {
       console.error(`Error fetching contact info for ${phoneNumber}:`, error.response?.data?.error?.message || error.message);
       return null;
@@ -506,10 +501,10 @@ export class WhatsAppService {
               where: { id: existingCustomer.id },
               data: {
                 lastActive: new Date(),
-                status: 'active',
+                status: 'ACTIVE',
                 name: contact.profile_name || existingCustomer.name,
-                ...(contact.is_business && {
-                  customerType: 'business',
+                ...(contact.is_business && contact.business_name && {
+                  customerType: 'BUSINESS',
                   businessName: contact.business_name
                 })
               }
@@ -524,11 +519,11 @@ export class WhatsAppService {
                 name: contact.profile_name || `Customer ${maskedPhone.slice(-4)}`,
                 source: 'whatsapp',
                 tags: ['whatsapp-registered'],
-                status: 'active',
+                status: 'ACTIVE',
                 lastActive: new Date(),
                 whatsappOptIn: true,
-                ...(contact.is_business && {
-                  customerType: 'business',
+                ...(contact.is_business && contact.business_name && {
+                  customerType: 'BUSINESS',
                   businessName: contact.business_name
                 })
               }
@@ -572,13 +567,18 @@ export class WhatsAppService {
       });
 
       const messages = response.data.data || [];
-      const uniquePhones = Array.from(new Set(messages.map((msg: any) => msg.from)));
-
+      const uniquePhones = Array.from(
+        new Set(
+          messages
+            .map((msg: any) => msg.from)
+            .filter((phone: any): phone is string => typeof phone === 'string')
+        )
+      );
       // Get contact info for each unique phone
       const contacts: ContactInfo[] = [];
 
       for (const phone of uniquePhones.slice(0, 50)) {
-        const contactInfo = await this.getContactInfo(phone);
+        const contactInfo = await this.getContactInfo(phone as string);
         if (contactInfo) {
           contacts.push(contactInfo);
         }
@@ -805,8 +805,11 @@ export class WhatsAppService {
       const updateData: any = {};
       if (product.name) updateData.name = product.name;
       if (product.description) updateData.description = product.description;
-      if (product.price !== undefined) updateData.price = Math.round(product.price * 100);
-      if (product.retailPrice !== undefined) updateData.price = Math.round(product.retailPrice * 100);
+      if (product.retailPrice !== null && product.retailPrice !== undefined) {
+        updateData.price = Math.round(product.retailPrice * 100);
+      } else if (product.price !== undefined) {
+        updateData.price = Math.round(product.price * 100);
+      }
       if (product.stockQuantity !== undefined) {
         updateData.availability = product.stockQuantity > 0 ? 'in stock' : 'out of stock';
       }
@@ -855,8 +858,6 @@ export class WhatsAppService {
       return { data: [] };
     }
   }
-
-  // ========== MESSAGE SENDING ==========
 
   async sendMessage<T>(phoneNumber: string, messageData: Omit<T, 'messaging_product' | 'recipient_type' | 'to'>): Promise<WhatsAppAPIResponse> {
     try {
@@ -1006,7 +1007,6 @@ export class WhatsAppService {
     return this.sendMessage(phoneNumber, messageData);
   }
 
-  // ========== MEDIA MESSAGES ==========
 
   async sendImage(phoneNumber: string, imageUrl: string, caption?: string): Promise<WhatsAppAPIResponse> {
     const mediaId = await this.uploadMedia(imageUrl, 'image');
@@ -1054,8 +1054,6 @@ export class WhatsAppService {
     }
   }
 
-  // ========== CHAT MANAGEMENT METHODS ==========
-
   private encryptMessageContent(content: string): { encrypted: string; iv: string; authTag: string } {
     return encryptionService.encrypt(content);
   }
@@ -1085,12 +1083,18 @@ export class WhatsAppService {
 
     const message = await prisma.message.create({
       data: {
-        ...rest,
+        conversationId: rest.conversationId,
+        senderType: rest.senderType,
+        messageType: rest.messageType,
+        status: rest.status,
         encryptedContent: encrypted,
         encryptionIv: iv,
         encryptionAuthTag: authTag,
         content: '[Encrypted]',
-        messageHash: encryptionService.generateMessageHash(content, new Date())
+        messageHash: encryptionService.generateMessageHash(content, new Date()),
+        ...(rest.senderId && { senderId: rest.senderId }),
+        ...(rest.whatsappMessageId && { whatsappMessageId: rest.whatsappMessageId }),
+        ...(rest.metadata && { metadata: rest.metadata })
       },
       include: {
         sender: {
@@ -1104,8 +1108,6 @@ export class WhatsAppService {
 
     return message;
   }
-
-  // ========== CONVERSATION MANAGEMENT ==========
 
   async getConversations(params: {
     status?: 'active' | 'resolved' | 'archived' | undefined;
@@ -1249,14 +1251,32 @@ export class WhatsAppService {
     });
 
     if (!conversation) {
+      // Find or create customer first
+      let customer = await prisma.customer.findUnique({
+        where: { phoneHash }
+      });
+
+      if (!customer) {
+        customer = await prisma.customer.create({
+          data: {
+            phone: this.maskPhoneNumber(customerPhone),
+            phoneHash,
+            name: `Customer ${customerPhone.slice(-4)}`,
+            source: 'whatsapp',
+            status: 'ACTIVE'
+          }
+        });
+      }
+
       conversation = await prisma.conversation.create({
         data: {
           customerPhone: this.maskPhoneNumber(customerPhone),
           customerPhoneHash: phoneHash,
           customerName: `Customer ${customerPhone.slice(-4)}`,
-          status: 'active',
+          status: 'ACTIVE',
           tags: ['New Customer'],
-          unreadCount: 0
+          unreadCount: 0,
+          customerId: customer.id  // Add this
         },
         include: {
           messages: true
@@ -1587,11 +1607,14 @@ export class WhatsAppService {
   }
 
   private getAvatar(nameOrPhone: string): string {
-    const parts = nameOrPhone.split(' ');
-    if (parts.length > 1) {
+    const parts = nameOrPhone.split(' ').filter(p => p.length > 0);
+    if (parts.length > 1 && parts[0]?.[0] && parts[1]?.[0]) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
-    return nameOrPhone.slice(0, 2).toUpperCase();
+    if (nameOrPhone.length >= 2) {
+      return nameOrPhone.slice(0, 2).toUpperCase();
+    }
+    return nameOrPhone.toUpperCase().padEnd(2, 'X');
   }
 
   async getTemplates(): Promise<any> {
@@ -1627,8 +1650,6 @@ export class WhatsAppService {
       }
     };
   }
-
-  // ========== BROADCAST & BULK MESSAGES ==========
 
   async sendBroadcast(data: {
     customerPhones: string[];
