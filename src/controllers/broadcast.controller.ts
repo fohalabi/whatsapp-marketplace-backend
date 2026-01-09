@@ -71,6 +71,14 @@ export class BroadcastController {
   async getTemplate(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Template ID is required'
+        });
+      }
+
       const result = await broadcastService.getTemplate(id);
       
       res.status(200).json({
@@ -103,6 +111,13 @@ export class BroadcastController {
         });
       }
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Template ID is required'
+        });
+      }
+
       const result = await broadcastService.updateTemplate(
         id, 
         req.body as UpdateTemplateDTO, 
@@ -130,6 +145,14 @@ export class BroadcastController {
   async deleteTemplate(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Template ID is required'
+        });
+      }
+
       const result = await broadcastService.deleteTemplate(id);
       
       res.status(200).json({
@@ -153,6 +176,14 @@ export class BroadcastController {
   async submitTemplateForApproval(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Template ID is required'
+        });
+      }
+
       const result = await broadcastService.submitTemplateForApproval(
         id, 
         req.body as SubmitTemplateDTO
@@ -214,11 +245,11 @@ export class BroadcastController {
       } = req.query;
 
       const params = {
-        status: status as string | undefined,
-        approvalStatus: approvalStatus as string | undefined,
-        search: search as string | undefined,
         page: parseInt(page as string),
-        limit: parseInt(limit as string)
+        limit: parseInt(limit as string),
+        ...(status && { status: status as string }),
+        ...(approvalStatus && { approvalStatus: approvalStatus as string }),
+        ...(search && { search: search as string })
       };
 
       const result = await broadcastService.getBroadcasts(params);
@@ -239,6 +270,14 @@ export class BroadcastController {
   async getBroadcast(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
+        });
+      }
+
       const result = await broadcastService.getBroadcast(id);
       
       res.status(200).json({
@@ -271,6 +310,13 @@ export class BroadcastController {
         });
       }
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
+        });
+      }
+
       const result = await broadcastService.updateBroadcast(
         id, 
         req.body as UpdateBroadcastDTO, 
@@ -298,6 +344,14 @@ export class BroadcastController {
   async submitBroadcastForApproval(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
+        });
+      }
+
       const result = await broadcastService.submitBroadcastForApproval(id);
       
       res.status(200).json({
@@ -327,6 +381,13 @@ export class BroadcastController {
         return res.status(401).json({
           success: false,
           message: 'Unauthorized: User ID required',
+        });
+      }
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
         });
       }
 
@@ -362,6 +423,13 @@ export class BroadcastController {
         });
       }
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
+        });
+      }
+
       const result = await broadcastService.rejectBroadcast(id, rejectionReason);
       
       res.status(200).json({
@@ -385,6 +453,14 @@ export class BroadcastController {
   async sendBroadcast(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
+        });
+      }
+
       const result = await broadcastService.sendBroadcast(id);
       
       res.status(200).json({
@@ -409,6 +485,14 @@ export class BroadcastController {
   async getBroadcastStats(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
+        });
+      }
+
       const result = await broadcastService.getBroadcastStats(id);
       
       res.status(200).json({
@@ -432,6 +516,14 @@ export class BroadcastController {
   async cancelBroadcast(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Broadcast ID is required'
+        });
+      }
+
       const result = await broadcastService.cancelBroadcast(id);
       
       res.status(200).json({
@@ -487,10 +579,10 @@ export class BroadcastController {
       } = req.query;
 
       const params = {
-        search: search as string | undefined,
         page: parseInt(page as string),
         limit: parseInt(limit as string),
-        tags: tags ? (tags as string).split(',') : undefined
+        ...(search && { search: search as string }),
+        ...(tags && { tags: (tags as string).split(',') })
       };
 
       const result = await broadcastService.getSegments(params);
@@ -511,6 +603,14 @@ export class BroadcastController {
   async getSegment(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Segment ID is required'
+        });
+      }
+
       const result = await broadcastService.getSegment(id);
       
       res.status(200).json({
@@ -543,6 +643,13 @@ export class BroadcastController {
         });
       }
 
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Segment ID is required'
+        });
+      }
+
       const result = await broadcastService.updateSegment(id, req.body, userId);
       
       res.status(200).json({
@@ -567,6 +674,13 @@ export class BroadcastController {
   async deleteSegment(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Segment ID is required'
+        });
+      }
+
       const result = await broadcastService.deleteSegment(id);
       
       res.status(200).json({
@@ -608,6 +722,14 @@ export class BroadcastController {
   async getSegmentStats(req: Request, res: Response) {
     try {
       const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Segment ID is required'
+        });
+      }
+
       const result = await broadcastService.getSegmentStats(id);
       
       res.status(200).json({
@@ -645,6 +767,13 @@ export class BroadcastController {
         return res.status(400).json({
           success: false,
           message: 'New name is required',
+        });
+      }
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Segment ID is required'
         });
       }
 

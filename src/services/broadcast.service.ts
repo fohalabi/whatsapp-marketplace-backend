@@ -1091,13 +1091,13 @@ export class BroadcastService {
     const newSegment = await prisma.segment.create({
       data: {
         name: newName,
-        description: segment.description,
         criteria: segment.criteria as any,
         tags: segment.tags,
         color: segment.color,
         customerCount: segment.customerCount,
         createdById: userId,
-        purchaseBehavior: segment.purchaseBehavior as any
+        purchaseBehavior: segment.purchaseBehavior as any,
+        ...(segment.description && { description: segment.description })
       }
     });
 
