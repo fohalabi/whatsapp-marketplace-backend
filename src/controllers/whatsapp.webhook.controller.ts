@@ -15,8 +15,6 @@ export class WhatsAppWebhookController {
     this.paystackService = new PaystackService();
   }
 
-  // ========== WEBHOOK VERIFICATION ==========
-
   verifyWebhook = (req: Request, res: Response) => {
     const mode = req.query['hub.mode'] as string;
     const token = req.query['hub.verify_token'] as string;
@@ -32,8 +30,6 @@ export class WhatsAppWebhookController {
       res.sendStatus(403);
     }
   };
-
-  // ========== WEBHOOK RECEIVING ==========
 
   receiveMessage = async (req: Request, res: Response) => {
     try {
@@ -62,8 +58,6 @@ export class WhatsAppWebhookController {
     }
   };
 
-  // ========== WEBHOOK PROCESSING ==========
-
   private async processWebhook(body: any) {
     if (body.object !== 'whatsapp_business_account') {
       console.log('Invalid webhook object:', body.object);
@@ -86,8 +80,6 @@ export class WhatsAppWebhookController {
   handleTemplateStatusUpdate(value: any) {
     throw new Error('Method not implemented.');
   }
-
-  // ========== INCOMING MESSAGE HANDLING ==========
 
   private async handleIncomingMessage(value: any) {
     const message = value.messages?.[0];
@@ -126,8 +118,6 @@ export class WhatsAppWebhookController {
       await this.handleTextAutoReply(from, processedMessage.content);
     }
   }
-
-  // ========== ORDER PROCESSING ==========
 
   private async handleOrder(value: any) {
     try {

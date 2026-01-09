@@ -1,3 +1,5 @@
+import { TemplateCategory } from "@prisma/client";
+
 // types/broadcast.types.ts
 export interface CreateTemplateDTO {
   name: string;
@@ -14,7 +16,7 @@ export interface CreateTemplateDTO {
 export interface UpdateTemplateDTO {
   name?: string;
   description?: string;
-  category?: string;
+  category?: TemplateCategory;
   header?: string;
   body?: string;
   footer?: string;

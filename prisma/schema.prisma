@@ -626,7 +626,7 @@ model BroadcastTemplate {
   
   variables String[] 
   
-  approvalStatus ApprovalStatus @default(PENDING)
+  approvalStatus ApproveStatus @default(PENDING)
   rejectionReason String? 
   
   whatsappTemplateId String? 

@@ -11,26 +11,24 @@ import {
   BroadcastStats,
   TemplateApprovalStatus
 } from '../types/broadcast.types';
+import { ApproveStatus } from '@prisma/client';
 
 export class BroadcastService {
-  
-  // ========== TEMPLATE MANAGEMENT ==========
-  
   async createTemplate(data: CreateTemplateDTO, userId: string) {
     try {
       const template = await prisma.broadcastTemplate.create({
         data: {
           name: data.name,
-          description: data.description,
           category: data.category,
-          header: data.header,
           body: data.body,
-          footer: data.footer,
           variables: data.variables || [],
           languageCode: data.languageCode || 'en_US',
-          sampleData: data.sampleData,
           approvalStatus: 'DRAFT',
-          createdBy: userId
+          createdBy: userId,
+          ...(data.description && { description: data.description }),
+          ...(data.header && { header: data.header }),
+          ...(data.footer && { footer: data.footer }),
+          ...(data.sampleData && { sampleData: data.sampleData })
         }
       });
 
@@ -156,12 +154,20 @@ export class BroadcastService {
     }
 
     const updatedTemplate = await prisma.broadcastTemplate.update({
-      where: { id },
-      data: {
-        ...data,
-        updatedAt: new Date()
-      }
-    });
+  where: { id },
+  data: {
+    updatedAt: new Date(),
+    ...(data.name && { name: data.name }),
+    ...(data.description && { description: data.description }),
+    ...(data.category && { category: data.category }),
+    ...(data.header && { header: data.header }),
+    ...(data.body && { body: data.body }),
+    ...(data.footer && { footer: data.footer }),
+    ...(data.variables && { variables: data.variables }),
+    ...(data.languageCode && { languageCode: data.languageCode }),
+    ...(data.sampleData && { sampleData: data.sampleData })
+  }
+});
 
     return updatedTemplate;
   }
@@ -288,8 +294,6 @@ export class BroadcastService {
     return components;
   }
 
-  // ========== BROADCAST MANAGEMENT ==========
-
   async createBroadcast(data: CreateBroadcastDTO, userId: string) {
     try {
       let segmentId: string | undefined;
@@ -333,16 +337,16 @@ export class BroadcastService {
       const broadcast = await prisma.broadcast.create({
         data: {
           name: data.name,
-          description: data.description,
           content: data.content,
-          templateId: data.templateId,
-          segmentId,
-          customFilter: data.customFilter,
           totalRecipients,
-          scheduledFor: data.scheduledFor,
           status: data.scheduledFor ? 'SCHEDULED' : 'DRAFT',
           approvalStatus: 'PENDING',
-          createdBy: userId
+          createdBy: userId,
+          ...(data.description && { description: data.description }),
+          ...(data.templateId && { templateId: data.templateId }),
+          ...(segmentId && { segmentId }),
+          ...(data.customFilter && { customFilter: data.customFilter }),
+          ...(data.scheduledFor && { scheduledFor: data.scheduledFor })
         }
       });
 
@@ -520,7 +524,7 @@ export class BroadcastService {
       throw new Error('Broadcast not found');
     }
 
-    if (broadcast.approvalStatus !== 'DRAFT') {
+    if (broadcast.approvalStatus !== 'PENDING') {  // Use enum
       throw new Error('Broadcast has already been submitted');
     }
 
@@ -535,12 +539,9 @@ export class BroadcastService {
     const updatedBroadcast = await prisma.broadcast.update({
       where: { id },
       data: {
-        approvalStatus: 'PENDING'
+        approvalStatus: ApproveStatus.PENDING  // Use enum
       }
     });
-
-    // Notify admins for approval (you'd implement this)
-    // this.notifyAdminsForApproval(updatedBroadcast);
 
     return updatedBroadcast;
   }
@@ -745,14 +746,16 @@ export class BroadcastService {
             broadcastId: broadcast.id,
             customerPhone: recipient.phoneHash,
             status: 'SENT',
-            whatsappMessageId: response.messages?.[0]?.id,
-            sentAt: new Date()
+            sentAt: new Date(),
+            ...(response.messages?.[0]?.id && {
+              whatsappMessageId: response.messages?.[0]?.id,
+            })
           }
         });
 
         // Rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error sending to recipient:', error);
         
         await prisma.broadcastRecipient.create({
@@ -760,8 +763,8 @@ export class BroadcastService {
             broadcastId: broadcast.id,
             customerPhone: recipient.phoneHash,
             status: 'FAILED',
-            failureReason: error.message,
-            failedAt: new Date()
+            failedAt: new Date(),
+            ...(error.message && { failureReason: error.message })
           }
         });
       }
@@ -859,7 +862,6 @@ export class BroadcastService {
       const segment = await prisma.segment.create({
         data: {
           name: data.name,
-          description: data.description,
           criteria: data.criteria,
           tags: data.tags || [],
           color: data.color || 'purple',
@@ -870,7 +872,8 @@ export class BroadcastService {
             totalRevenue: 0,
             lastPurchase: '',
             preferredCategories: []
-          }
+          },
+          ...(data.description && { description: data.description })
         }
       });
 
@@ -1089,7 +1092,7 @@ export class BroadcastService {
       data: {
         name: newName,
         description: segment.description,
-        criteria: segment.criteria,
+        criteria: segment.criteria as any,
         tags: segment.tags,
         color: segment.color,
         customerCount: segment.customerCount,
