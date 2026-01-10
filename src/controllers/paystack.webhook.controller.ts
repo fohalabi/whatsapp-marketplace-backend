@@ -66,7 +66,7 @@ export class PaystackWebhookController {
     const order = await orderService.getOrderByReference(reference);
     if (!order) return;
 
-    // verify amount matches order total
+    // Amount verification (outside transaction - read-only check)
     if (amountPaid !== order.totalAmount) {
       console.error('⚠️ Payment amount mismatch', {
         orderId: order.id,
@@ -74,32 +74,61 @@ export class PaystackWebhookController {
         received: amountPaid,
         reference
       });
-
       return;
     }
 
-    await orderService.updatePaymentStatus(reference, 'PAID');
+    // Execute all database operations in a transaction
+    const { invoice, pdfUrl } = await prisma.$transaction(async (tx) => {
+      // Update payment status
+      await tx.customerOrder.update({
+        where: { paymentReference: reference },
+        data: { 
+          paymentStatus: 'PAID',
+          status: 'PROCESSING'
+        }
+      });
 
-    // Escrow entry
-    await prisma.escrow.create({
-      data: {
-        orderId: order.id,
-        merchantId: order.merchantId,
-        amount: order.totalAmount,
-        status: 'HELD',
-      },
+      // Create escrow
+      await tx.escrow.create({
+        data: {
+          orderId: order.id,
+          merchantId: order.merchantId,
+          amount: order.totalAmount,
+          status: 'HELD',
+        },
+      });
+
+      // Generate invoice (returns invoice data)
+      return await invoiceService.createInvoice(order.id);
     });
 
-    const { invoice, pdfUrl } = await invoiceService.createInvoice(order.id);
+    // External API calls AFTER transaction (can retry if fail)
+    try {
+      await whatsappService.sendDocument(
+        order.customerPhone,
+        pdfUrl,
+        `✅ Payment Confirmed! Invoice #${invoice.invoiceNumber}`,
+        `${invoice.invoiceNumber}.pdf`
+      );
 
-    // Send invoice via WhatsApp
-    await whatsappService.sendDocument(
-      order.customerPhone,
-      pdfUrl,
-      `✅ Payment Confirmed! Invoice #${invoice.invoiceNumber}`,
-      `${invoice.invoiceNumber}.pdf`
-    );
+      const confirmationMessage = `
+        ✅ Payment Confirmed!
+        Order Number: ${order.orderNumber}
+        Invoice Number: ${invoice.invoiceNumber}
+        Amount Paid: ₦${amountPaid.toLocaleString()}
 
+        Your order is being processed. We'll notify you when it's ready for delivery.
+
+        Thank you for your purchase! 🎉
+      `.trim();
+
+      await whatsappService.sendMessage(order.customerPhone, confirmationMessage);
+    } catch (whatsappError) {
+      console.error('⚠️ WhatsApp notification failed (order still processed):', whatsappError);
+      // Don't throw - payment already confirmed
+    }
+
+    // Delivery creation (separate from transaction)
     try {
       const deliveryOrchestrator = new DeliveryOrchestrator();
       await deliveryOrchestrator.createDelivery(order.id);
@@ -107,20 +136,6 @@ export class PaystackWebhookController {
     } catch (error: any) {
       console.error('⚠️ Delivery creation failed:', error.message);
     }
-
-    // Send confirmation message
-    const confirmationMessage = `
-      ✅ Payment Confirmed!
-      Order Number: ${order.orderNumber}
-      Invoice Number: ${invoice.invoiceNumber}
-      Amount Paid: ₦${amountPaid.toLocaleString()}
-
-      Your order is being processed. We'll notify you when it's ready for delivery.
-
-      Thank you for your purchase! 🎉
-    `.trim();
-
-    await whatsappService.sendMessage(order.customerPhone, confirmationMessage);
 
     console.log('Payment confirmed and invoice sent:', { reference, amountPaid });
   }

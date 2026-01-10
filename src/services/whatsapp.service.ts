@@ -894,7 +894,7 @@ export class WhatsAppService {
       }
     };
 
-    return this.sendMessage(phoneNumber, messageData);
+    return this.retryOperation(() => this.sendMessage(phoneNumber, messageData));
   }
 
   async sendTemplate(
@@ -1032,7 +1032,7 @@ export class WhatsAppService {
       }
     };
 
-    return this.sendMessage(phoneNumber, messageData);
+    return this.retryOperation(() => this.sendMessage(phoneNumber, messageData));
   }
 
   async uploadMedia(url: string, type: string): Promise<string> {
@@ -1807,6 +1807,29 @@ export class WhatsAppService {
         averagePerDay: 0
       };
     }
+  }
+
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    delayMs: number = 1000
+  ): Promise<T> {
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`Attempt ${attempt}/${maxRetries} failed:`, error.message);
+
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+        }
+      }
+    }
+
+    throw lastError;
   }
 }
 
