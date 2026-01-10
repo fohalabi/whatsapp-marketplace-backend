@@ -125,6 +125,7 @@ httpServer.listen(PORT, () => {
   console.log(`🔌 WebSocket server initialized`);
   console.log(`🌐 App URL: ${process.env.APP_URL || 'http://localhost:3001'}`);
   console.log(`📡 Socket.IO endpoint: ws://localhost:${PORT}`);
+  startPaymentTimeoutJob();
 });
 
 // Handle server shutdown gracefully

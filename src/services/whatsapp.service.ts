@@ -141,8 +141,6 @@ export interface MessageStats {
   firstMessageDate?: Date | undefined;
 }
 
-// ========== MAIN WHATSAPP SERVICE CLASS ==========
-
 export class WhatsAppService {
   // WhatsApp API Configuration
   private readonly baseURL: string = 'https://graph.facebook.com/v18.0';
@@ -184,7 +182,7 @@ export class WhatsAppService {
     this.checkTokenHealth().catch(console.error);
     this.startTokenMonitor();
 
-    console.log(`✅ WhatsApp Service initialized for Phone ID: ${this.phoneId}`);
+    // console.log(`✅ WhatsApp Service initialized for Phone ID: ${this.phoneId}`);
   }
 
   private setupInterceptors() {
@@ -219,7 +217,7 @@ export class WhatsAppService {
   async checkTokenHealth(): Promise<void> {
     try {
       await this.axiosInstance.get(`/${this.phoneId}?fields=id`);
-      console.log('✅ Token is valid');
+      // console.log('✅ Token is valid');
 
       if (!this.tokenInfo.expiresAt) {
         const estimatedExpiry = Math.floor(Date.now() / 1000) + (55 * 24 * 60 * 60);
@@ -1546,7 +1544,6 @@ export class WhatsAppService {
       return { data: [] };
     }
   }
-  // ========== UTILITY METHODS ==========
 
   private formatPhoneNumber(phoneNumber: string): string {
     let formatted = phoneNumber.replace(/\D/g, '');
@@ -1714,8 +1711,6 @@ export class WhatsAppService {
       errors
     };
   }
-
-  // ========== CONTACTS STATISTICS ==========
 
   async getContactsOverview(): Promise<{
     totalContacts: number;

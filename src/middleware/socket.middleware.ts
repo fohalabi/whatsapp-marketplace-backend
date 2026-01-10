@@ -1,7 +1,6 @@
 import { Server as SocketServer, Socket } from 'socket.io';
 import { createServer } from 'http';
 import express from 'express';
-import { whatsappService } from '../services/whatsapp.service';
 
 // Create separate Express app for Socket.IO
 const socketApp = express();
@@ -85,6 +84,7 @@ class SocketManager {
 
   private async handleAdminMessage(socket: Socket, data: { customerPhone: string; message: string }) {
     try {
+      const { whatsappService } = await import('../services/whatsapp.service');
       const result = await whatsappService.sendText(data.customerPhone, data.message);
       
       this.io.to('admins').emit('admin:message_sent', {
@@ -115,6 +115,7 @@ class SocketManager {
     
     for (const phone of data.customerPhones) {
       try {
+        const { whatsappService } = await import('../services/whatsapp.service');
         const result = await whatsappService.sendText(phone, data.message);
         results.push({ phone, success: true });
       } catch (error: any) {
