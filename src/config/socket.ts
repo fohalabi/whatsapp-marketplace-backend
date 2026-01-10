@@ -42,9 +42,6 @@ export class SocketManager {
         timestamp: new Date().toISOString()
       });
 
-      // ========== ADMIN EVENTS ==========
-
-      // Admin sends message to customer
       socket.on('admin:send_message', async (data: { customerPhone: string; message: string }) => {
         console.log(`💬 Admin ${socket.id} sending to ${data.customerPhone}: ${data.message}`);
         
@@ -160,9 +157,6 @@ export class SocketManager {
     });
   }
 
-  // ========== PUBLIC METHODS ==========
-
-  // Notify all admins of new incoming message
   public notifyNewMessage(customerPhone: string, message: any) {
     // Add to conversation history
     this.addToConversation(customerPhone, {

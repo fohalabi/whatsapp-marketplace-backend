@@ -28,6 +28,7 @@ import riderRoutes from './routes/rider.routes';
 import deliveryRoutes from './routes/delivery.routes';
 import broadcastRoutes from './routes/broadcast.routes';
 import { OrderCleanupJob } from './jobs/orderCleanup.job';
+import { DeliveryRetryJob } from './jobs/deliveryRetry.job';
 
 dotenv.config();
 
@@ -36,6 +37,9 @@ const PORT = process.env.PORT || 5000;
 
 const cleanupJob = new OrderCleanupJob();
 cleanupJob.start();
+
+const deliveryRetryJob = new DeliveryRetryJob();
+deliveryRetryJob.start();
 
 // Create HTTP server for Socket.IO
 const httpServer = createServer(app);

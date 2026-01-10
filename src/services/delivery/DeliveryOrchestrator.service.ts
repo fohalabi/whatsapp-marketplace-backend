@@ -46,9 +46,9 @@ export class DeliveryOrchestrator {
       pickupAddress: merchant.location,
       pickupLatitude: merchant.latitude,
       pickupLongitude: merchant.longitude,
-      deliveryAddress: 'Customer Location', // TODO: Get from customer
-      deliveryLatitude: 6.5355, // TODO: Get from customer
-      deliveryLongitude: 3.3087, // TODO: Get from customer
+      deliveryAddress: order.deliveryAddress || 'Address pending', 
+      deliveryLatitude: order.deliveryLatitude || 6.5355, 
+      deliveryLongitude: order.deliveryLongitude || 3.3087,
       recipientName: order.customerPhone,
       recipientPhone: order.customerPhone,
     };
@@ -71,6 +71,46 @@ export class DeliveryOrchestrator {
 
     // Log event
     await this.logEvent(delivery.id, delivery.status);
+
+    // Alert if no rider available
+    if (!rider)  {
+      console.warn ('⚠️ No available rider for delivery:', deliveryNumber);
+
+      // Log to activity log for admin dashboard
+      await prisma.activityLog.create({
+        data: {
+          userId: 'SYSTEM',
+          action: 'no_rider_available',
+          description: `Delivery ${deliveryNumber} created but no rider available`,
+        }
+      });
+
+      // Emit socket event to admin dashboard
+      try {
+        const io = getIO();
+        io.emit('rider_shortage-alert', {
+          deliveryId: delivery.id,
+          deliveryNumber, 
+          orderNumber: order.orderNumber,
+          message: 'No availabe riders - manual assignment needed'
+        });
+      } catch (error) {
+        console.error('Socket alert failed:', error);
+      }
+
+      // Notify customer about slight delay
+      await whatsappService.sendMessage(
+        order.customerPhone,
+        `📦 Your order is confirmed!
+        
+        We're assigning the best rider for yout delivery. You'll be notified shortly once a rider is assigned.
+        
+        Order: ${order.orderNumber}
+        Delivery: ${deliveryNumber}
+        
+        Thank you for your patience! `
+      );
+    }
 
     // Update rider if assigned
     if (rider) {
@@ -237,5 +277,135 @@ Thank you for shopping with us! 🎉`,
 
     const nextNumber = (count + 1).toString().padStart(4, '0');
     return `${prefix}-${nextNumber}`;
+  }
+
+  async reassignDelivery(deliveryId: string, reason?: string) {
+    const delivery = await prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      include: { rider: true, order: true }
+    });
+
+    if (!delivery) throw new Error('Delivery not found');
+
+    const previousRider = delivery.rider;
+
+    // Find new available rider (exclude previous rider)
+    const newRider = await prisma.rider.findFirst({
+      where: {
+        status: 'AVAILABLE',
+        id: { not: delivery.riderId || undefined }
+      }
+    });
+
+    if (!newRider) {
+      console.warn('⚠️ No available rider for reassignment:', deliveryId);
+
+      // Alert admin
+      await prisma.activityLog.create({
+        data: {
+          userId: 'SYSTEM',
+          action: 'delivery_reassignment_failed',
+          description: `Delivery ${delivery.deliveryNumber} reassignment failed - no available riders. Reason: ${reason || 'Manual reassignment'}`
+        }
+      });
+
+      // Emit alert
+      try {
+        const io = getIO();
+        io.emit('delivery-reassignment-failed', {
+          deliveryId,
+          deliveryNumber: delivery.deliveryNumber,
+          reason: reason || 'No available riders'
+        });
+      } catch (error) {
+        console.error('Socket error:', error);
+      }
+
+      return null;
+    }
+
+    // Update delivery with new rider
+    const updated = await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        riderId: newRider.id,
+        status: 'ASSIGNED',
+        assignedAt: new Date()
+      },
+      include: { rider: true }
+    });
+
+    // Log event
+    await this.logEvent(deliveryId, 'ASSIGNED', 
+      `Reassigned from ${previousRider?.firstName || 'unassigned'} to ${newRider.firstName}. Reason: ${reason || 'Manual'}`
+    );
+
+    // Update rider statuses
+    if (previousRider) {
+      await prisma.rider.update({
+        where: { id: previousRider.id },
+        data: { status: 'AVAILABLE' }
+      });
+    }
+
+    await prisma.rider.update({
+      where: { id: newRider.id },
+      data: { status: 'BUSY' }
+    });
+
+    // Notify new rider
+    try {
+      const io = getIO();
+      io.to(`rider-${newRider.userId}`).emit('new-delivery', {
+        deliveryId: updated.id,
+        deliveryNumber: updated.deliveryNumber,
+        pickupAddress: updated.pickupAddress,
+        deliveryAddress: updated.deliveryAddress
+      });
+    } catch (error) {
+      console.error('Socket error:', error);
+    }
+
+    // Notify customer
+    await whatsappService.sendMessage(
+      delivery.order.customerPhone,
+      `🔄 Rider Update
+
+        Delivery: ${delivery.deliveryNumber}
+        New Rider: ${newRider.firstName}
+
+        Your delivery is being reassigned to ensure timely delivery.`
+    );
+
+    console.log(`✅ Delivery reassigned: ${delivery.deliveryNumber} → ${newRider.firstName}`);
+    return updated;
+  }
+
+  async retryStuckDeliveries() {
+    const stuckThreshold = new Date(Date.now() - 30 * 60 * 1000); // 30 mins
+
+    // Find deliveries assigned but not picked up after 30 mins
+    const stuckDeliveries = await prisma.delivery.findMany({
+      where: {
+        status: 'ASSIGNED',
+        assignedAt: { lt: stuckThreshold }
+      },
+      include: { rider: true }
+    });
+
+    for (const delivery of stuckDeliveries) {
+      console.warn(`⚠️ Stuck delivery detected: ${delivery.deliveryNumber}`);
+      
+      try {
+        await this.reassignDelivery(
+          delivery.id, 
+          'Automatic reassignment - rider not responding'
+        );
+      } catch (error) {
+        console.error(`Failed to reassign delivery ${delivery.deliveryNumber}:`, error);
+      }
+    }
+
+    return stuckDeliveries.length;
   }
 }

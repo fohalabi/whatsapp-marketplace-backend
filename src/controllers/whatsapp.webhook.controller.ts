@@ -268,14 +268,29 @@ export class WhatsAppWebhookController {
 
       // Ask for email
       const emailRequestMessage = `
-      ✅ Order Received! 
-      Order Number: ${createdOrder.orderNumber}
-      Total Amount: ₦${totalAmount.toLocaleString()}
+        ✅ Order Received! 
+        Order Number: ${createdOrder.orderNumber}
+        Total Amount: ₦${totalAmount.toLocaleString()}
 
-      📧 Please reply with your email address to receive your receipt and invoice.
+        📧 Please reply with your email address to receive your receipt and invoice.
 
-      Or type SKIP if you don't want to provide an email.
-    `.trim();
+        Or type SKIP if you don't want to provide an email.
+      `.trim();
+
+      const locationRequest = `
+       📍 Delivery Location Required
+        
+        Order: ${createdOrder.orderNumber}
+        Total: ₦${totalAmount.toLocaleString()}
+        
+        Please share your delivery location:
+        
+        1️⃣ Tap the 📎 (attachment) icon
+        2️⃣ Select "Location"
+        3️⃣ Choose "Send your current location" or search for an address
+
+        Or reply with your full delivery address.
+      `.trim();
 
       await whatsappService.sendMessage(customerPhone, emailRequestMessage);
     } catch (error) {
@@ -302,12 +317,126 @@ export class WhatsAppWebhookController {
 
   // Placeholder methods for missing implementations to avoid compilation errors
   private async processMessage(message: any, value: any): Promise<any> {
-    console.warn('processMessage not implemented');
-    const text = message.text?.body || '';
-    return { content: text };
+    const from = message.from;
+    const type = message.type;
+
+    // Handle location type
+    if (type == 'location') {
+      await this.handleLocationMessage(message, from);
+      return {
+        content: `Location: ${message.location.latitude}, ${message.location.longitude}`,
+        metadata: message.location
+      };
+    }
+
+    // handle text (could be address)
+    if (type === 'text') {
+      const text = message.text?.body || '';
+
+      // Check if customer has pending order awaiting location
+      const pendingOrder = await prisma.customerOrder.findFirst({
+        where: {
+          customerPhone: from,
+          status: 'PENDING',
+          deliveryAddress: null
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (pendingOrder) {
+        await this.handleAddressText(from, text, pendingOrder);
+      }
+
+      return { content: text };
+    }
+    return { content: '' };
   }
 
   private async handleTextAutoReply(from: string, content: string) {
     // console.log('Auto-reply not implemented');
+  }
+
+  private async handleLocationMessage(message: any, customerPhone: string) {
+    const { latitude, longitude } = message.location;
+
+    // Find pending order
+    const order = await prisma.customerOrder.findFirst({
+      where: {
+        customerPhone,
+        status: 'PENDING',
+        deliveryAddress: null
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!order) {
+      await whatsappService.sendMessage(
+        customerPhone,
+        '❌ No pending order found. Please place an order first.'
+      );
+      return;
+    }
+
+    // Update order with location
+    await prisma.customerOrder.update({
+      where: { id: order.id },
+      data: {
+        deliveryAddress: `Lat: ${latitude}, Long: ${longitude}`,
+        deliveryLatitude: latitude,
+        deliveryLongitude: longitude
+      }
+    });
+
+    // Send payment link
+    await this.sendPaymentLink(order, customerPhone);
+  }
+
+  private async handleAddressText(customerPhone: string, address: string, order: any) {
+    // Simple validation
+    if (address.length < 10) {
+      await whatsappService.sendMessage(
+        customerPhone,
+        '❌ Address too short. Please provide your complete delivery address.'
+      );
+      return;
+    }
+
+    // Update order with text address (you'd geocode this later)
+    await prisma.customerOrder.update({
+      where: { id: order.id },
+      data: {
+        deliveryAddress: address,
+        // TODO: Geocode address to get lat/long
+        deliveryLatitude: 6.5355, // Fallback to default
+        deliveryLongitude: 3.3087
+      }
+    });
+
+    // Send payment link
+    await this.sendPaymentLink(order, customerPhone);
+  }
+
+  private async sendPaymentLink(order: any, customerPhone: string) {
+    const paystackService = new PaystackService();
+    
+    const payment = await paystackService.initializePayment(
+      order.customerEmail,
+      order.totalAmount,
+      order.paymentReference,
+      order.id
+    );
+
+    await whatsappService.sendMessage(
+      customerPhone,
+      `✅ Location Received!
+
+      Order: ${order.orderNumber}
+      Amount: ₦${order.totalAmount.toLocaleString()}
+
+      💳 Complete Payment:
+      ${payment.authorization_url}
+
+      Payment expires in 30 minutes.`
+    );
   }
 }

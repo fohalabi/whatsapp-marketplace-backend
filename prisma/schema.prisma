@@ -269,6 +269,9 @@ model CustomerOrder {
   refundAmount        Float?
   refundedAt          DateTime?
   refundNotes         String?
+  deliveryAddress     String?
+  deliveryLatitude    Float?
+  deliveryLongitude   Float?
 
   escrow              Escrow?
   payouts             Payout[]

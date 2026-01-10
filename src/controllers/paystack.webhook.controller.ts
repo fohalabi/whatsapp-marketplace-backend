@@ -7,6 +7,7 @@ import path from 'path';
 import { getRedis } from '../config/redis';
 import prisma from '../config/database';
 import { DeliveryOrchestrator } from '../services/delivery/DeliveryOrchestrator.service';
+import { PaystackService } from '../services/paystack.service';
 
 const orderService = new OrderService();
 const whatsappService = new WhatsAppService();
@@ -14,6 +15,14 @@ const invoiceService = new InvoiceService();
 const processWebhooks = new Set<string>();
 
 export class PaystackWebhookController {
+  private orderService: OrderService;
+  private paystackService: PaystackService;
+
+  constructor() {
+    this.orderService = new OrderService();
+    this.paystackService = new PaystackService()
+  }
+
   async handleWebhook(req: Request, res: Response) {
     try {
       // Verify Paystack signature
@@ -39,9 +48,6 @@ export class PaystackWebhookController {
         return res.sendStatus(200);
       }
 
-      // Mark as processed
-      await redis.setex(webhookId, 86400, '1');
-
       // Handle successful payment
       if (event.event === 'charge.success') {
         await this.handleSuccessfulPayment(event.data);
@@ -66,7 +72,7 @@ export class PaystackWebhookController {
     const order = await orderService.getOrderByReference(reference);
     if (!order) return;
 
-    // Amount verification (outside transaction - read-only check)
+    // Amount verification
     if (amountPaid !== order.totalAmount) {
       console.error('⚠️ Payment amount mismatch', {
         orderId: order.id,
@@ -77,9 +83,50 @@ export class PaystackWebhookController {
       return;
     }
 
-    // Execute all database operations in a transaction
-    const { invoice, pdfUrl } = await prisma.$transaction(async (tx) => {
-      // Update payment status
+    // Re-validate stock availability before confirming payment
+    const stockCheck = await this.validateStockAvailability(order.id);
+
+    if (!stockCheck.available) {
+      console.error('⚠️ Insufficient stock at payment time', {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        issues: stockCheck.issues
+      });
+
+      // Initiate refund
+      try {
+        await this.paystackService.refundPayment(reference, order.totalAmount);
+        console.log('✅ Refund initiated for order:', order.orderNumber);
+      } catch (refundError) {
+        console.error('❌ Refund failed:', refundError);
+      }
+
+      // update order status
+      await prisma.customerOrder.update({
+        where: { id: order.id },
+        data: {
+          status: 'CANCELLED',
+          paymentStatus: 'FAILED'
+        }
+      });
+
+      // Notify customer
+      await whatsappService.sendMessage(
+        order.customerPhone,
+        ` Order Cancelled - Stock Unavailable
+        
+        Order: ${order.orderNumber}
+        
+        Unfortunately, some items in your order are no longer in stock. Your payment of ₦${amountPaid.toLocaleString()} will be refunded within 5-7 business days.
+
+        We apologize for the inconvenience.`
+      );
+
+      return; 
+    }
+
+    // Critical database operations (atomic)
+    await prisma.$transaction(async (tx) => {
       await tx.customerOrder.update({
         where: { paymentReference: reference },
         data: { 
@@ -88,7 +135,6 @@ export class PaystackWebhookController {
         }
       });
 
-      // Create escrow
       await tx.escrow.create({
         data: {
           orderId: order.id,
@@ -97,24 +143,49 @@ export class PaystackWebhookController {
           status: 'HELD',
         },
       });
-
-      // Generate invoice (returns invoice data)
-      return await invoiceService.createInvoice(order.id);
     });
 
-    // External API calls AFTER transaction (can retry if fail)
+    // Invoice generation with retry (outside transaction)
+    let invoice, pdfUrl;
     try {
-      await whatsappService.sendDocument(
-        order.customerPhone,
-        pdfUrl,
-        `✅ Payment Confirmed! Invoice #${invoice.invoiceNumber}`,
-        `${invoice.invoiceNumber}.pdf`
-      );
+      const result = await this.retryInvoiceGeneration(order.id, 3);
+      invoice = result.invoice;
+      pdfUrl = result.pdfUrl;
+    } catch (error: any) {
+      console.error('⚠️ Invoice generation failed after retries:', error.message);
+      
+      await prisma.activityLog.create({
+        data: {
+          userId: 'SYSTEM',
+          action: 'invoice_generation_failed',
+          description: `Order ${order.orderNumber} - manual invoice needed`,
+        }
+      });
+      
+      invoice = null;
+      pdfUrl = null;
+    }
 
+    // Send invoice if generated
+    if (invoice && pdfUrl) {
+      try {
+        await whatsappService.sendDocument(
+          order.customerPhone,
+          pdfUrl,
+          `✅ Payment Confirmed! Invoice #${invoice.invoiceNumber}`,
+          `${invoice.invoiceNumber}.pdf`
+        );
+      } catch (error) {
+        console.error('⚠️ Invoice delivery failed:', error);
+      }
+    }
+
+    // Send confirmation message
+    try {
       const confirmationMessage = `
         ✅ Payment Confirmed!
         Order Number: ${order.orderNumber}
-        Invoice Number: ${invoice.invoiceNumber}
+        ${invoice ? `Invoice Number: ${invoice.invoiceNumber}` : ''}
         Amount Paid: ₦${amountPaid.toLocaleString()}
 
         Your order is being processed. We'll notify you when it's ready for delivery.
@@ -123,12 +194,11 @@ export class PaystackWebhookController {
       `.trim();
 
       await whatsappService.sendMessage(order.customerPhone, confirmationMessage);
-    } catch (whatsappError) {
-      console.error('⚠️ WhatsApp notification failed (order still processed):', whatsappError);
-      // Don't throw - payment already confirmed
+    } catch (error) {
+      console.error('⚠️ Confirmation message failed:', error);
     }
 
-    // Delivery creation (separate from transaction)
+    // Create delivery
     try {
       const deliveryOrchestrator = new DeliveryOrchestrator();
       await deliveryOrchestrator.createDelivery(order.id);
@@ -137,7 +207,7 @@ export class PaystackWebhookController {
       console.error('⚠️ Delivery creation failed:', error.message);
     }
 
-    console.log('Payment confirmed and invoice sent:', { reference, amountPaid });
+    console.log('Payment confirmed:', { reference, amountPaid });
   }
 
   private async handleFailedPayment(data: any) {
@@ -164,5 +234,60 @@ export class PaystackWebhookController {
     await whatsappService.sendMessage(order.customerPhone, failureMessage);
 
     console.log('Payment failed:', { reference });
+  }
+
+  private async retryInvoiceGeneration(orderId: string, maxRetries: number) {
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await invoiceService.createInvoice(orderId);
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`Invoice generation attempt ${attempt}/${maxRetries} failed:`, error.message);
+        
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
+      }
     }
+
+    throw lastError;
+  }
+
+  private async validateStockAvailability(orderId: string): Promise<{
+    available: boolean;
+    issues: Array<{ productId: string; productName: string; required: number; available: number }>;
+  }> {
+    const order = await prisma.customerOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: { product: true }
+        }
+      }
+    });
+
+    if (!order) {
+      return { available: false, issues: [] };
+    }
+
+    const issues = [];
+
+    for (const item of order.items) {
+      if (item.product.stockQuantity < item.quantity) {
+        issues.push({
+          productId: item.productId,
+          productName: item.product.name,
+          required: item.quantity,
+          available: item.product.stockQuantity
+        });
+      }
+    }
+
+    return {
+      available: issues.length === 0,
+      issues
+    };
+  }
 }
