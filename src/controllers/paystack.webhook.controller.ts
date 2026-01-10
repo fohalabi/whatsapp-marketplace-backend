@@ -6,6 +6,7 @@ import { InvoiceService } from '../services/invoice.service';
 import path from 'path';
 import { getRedis } from '../config/redis';
 import prisma from '../config/database';
+import { DeliveryOrchestrator } from '../services/delivery/DeliveryOrchestrator.service';
 
 const orderService = new OrderService();
 const whatsappService = new WhatsAppService();
@@ -31,10 +32,10 @@ export class PaystackWebhookController {
 
       // Check if already processed
       const redis = getRedis();
-      const exists = await redis.get(webhookId);
+      const waSet = await redis.set(webhookId, '1', 'EX', 86400, 'NX');
 
-      if (exists) {
-        console.log('Webhook already processed:', webhookId);
+      if(!waSet) {
+        console.log('⚠️ Webhook already processed:', webhookId);
         return res.sendStatus(200);
       }
 
@@ -62,10 +63,22 @@ export class PaystackWebhookController {
     const reference = data.reference;
     const amountPaid = data.amount / 100;
 
-    await orderService.updatePaymentStatus(reference, 'PAID');
-
     const order = await orderService.getOrderByReference(reference);
     if (!order) return;
+
+    // verify amount matches order total
+    if (amountPaid !== order.totalAmount) {
+      console.error('⚠️ Payment amount mismatch', {
+        orderId: order.id,
+        expected: order.totalAmount,
+        received: amountPaid,
+        reference
+      });
+
+      return;
+    }
+
+    await orderService.updatePaymentStatus(reference, 'PAID');
 
     // Escrow entry
     await prisma.escrow.create({
@@ -91,16 +104,24 @@ export class PaystackWebhookController {
       `${invoice.invoiceNumber}.pdf`
     );
 
+    try {
+      const deliveryOrchestrator = new DeliveryOrchestrator();
+      await deliveryOrchestrator.createDelivery(order.id);
+      console.log('✅ Delivery created for order:', order.orderNumber);
+    } catch (error: any) {
+      console.error('⚠️ Delivery creation failed:', error.message);
+    }
+
     // Send confirmation message
     const confirmationMessage = `
-  ✅ Payment Confirmed!
-  Order Number: ${order.orderNumber}
-  Invoice Number: ${invoice.invoiceNumber}
-  Amount Paid: ₦${amountPaid.toLocaleString()}
+      ✅ Payment Confirmed!
+      Order Number: ${order.orderNumber}
+      Invoice Number: ${invoice.invoiceNumber}
+      Amount Paid: ₦${amountPaid.toLocaleString()}
 
-  Your order is being processed. We'll notify you when it's ready for delivery.
+      Your order is being processed. We'll notify you when it's ready for delivery.
 
-  Thank you for your purchase! 🎉
+      Thank you for your purchase! 🎉
     `.trim();
 
     await whatsappService.sendMessage(order.customerPhone, confirmationMessage);

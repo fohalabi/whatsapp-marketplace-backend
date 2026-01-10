@@ -129,6 +129,22 @@ export class WhatsAppWebhookController {
 
       console.log(`🛒 Order received from ${customerPhone}`, { orderId, catalogId });
 
+      const existingOrder = await prisma.customerOrder.findFirst({
+        where: {
+          customerPhone,
+          paymentReference: `WA_${orderId}`
+        }
+      });
+
+      if (existingOrder) {
+        console.log('⚠️ Duplicate order detected:', orderId);
+        await whatsappService.sendMessage(
+          customerPhone,
+          `This order has already been processed. Order Number: ${existingOrder.orderNumber}`
+        );
+        return;
+      }
+
       // Extract order items
       const items = order.product_items?.map((item: any) => ({
         productId: item.product_retailer_id,
@@ -212,7 +228,8 @@ export class WhatsAppWebhookController {
         items,
         totalAmount,
         paymentReference,
-        merchantId
+        merchantId,
+        orderId
       );
 
       // Initialize Paystack payment

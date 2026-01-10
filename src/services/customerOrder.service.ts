@@ -15,7 +15,8 @@ export class OrderService {
     items: any[], 
     totalAmount: number,
     paymentReference: string,
-    merchantId: string
+    merchantId: string,
+    whatsappOrderId?: string
   ) {
     const orderNumber = await this.generateOrderNumber();
 
@@ -34,6 +35,7 @@ export class OrderService {
             price: item.price,
           })),
         },
+        ...(whatsappOrderId && { metadata: { whatsappOrderId } })
       },
       include: {
         items: {
