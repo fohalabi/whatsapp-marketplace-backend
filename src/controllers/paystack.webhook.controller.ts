@@ -88,12 +88,8 @@ export class PaystackWebhookController {
         amount: order.totalAmount,
         status: 'HELD',
       },
-    }),
+    });
 
-    // Reduce stock
-    await orderService.reduceStock(order.id);
-
-    // Generate invoice
     const { invoice, pdfUrl } = await invoiceService.createInvoice(order.id);
 
     // Send invoice via WhatsApp

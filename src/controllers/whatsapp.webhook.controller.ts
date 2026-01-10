@@ -161,6 +161,9 @@ export class WhatsAppWebhookController {
       // Check stock availability and get merchantId
       let merchantId = '';
 
+      // Reserve stock atomically during validation
+      const stockReservations = [];
+
       for (const item of items) {
         const product = await prisma.product.findUnique({
           where: { id: item.productId },
@@ -169,7 +172,7 @@ export class WhatsAppWebhookController {
         if (!product) {
           await whatsappService.sendMessage(
             customerPhone,
-            `❌ Sorry, product not found. Please try again or contact support.`
+            `❌ Product not found. Please try again.`
           );
           return;
         }
@@ -178,18 +181,39 @@ export class WhatsAppWebhookController {
           merchantId = product.merchantId;
         }
 
-        if (product.stockQuantity < item.quantity) {
+        // Atomic stock check and temporary reservation
+        const updated = await prisma.product.updateMany({
+          where: {
+            id: item.productId,
+            stockQuantity: { gte: item.quantity } // Only update if stock sufficient
+          },
+          data: {
+            stockQuantity: { decrement: item.quantity }
+          }
+        });
+
+        if (updated.count === 0) {
+          // Stock insufficient - rollback previous reservations
+          for (const reservation of stockReservations) {
+            await prisma.product.update({
+              where: { id: reservation.productId },
+              data: { stockQuantity: { increment: reservation.quantity } }
+            });
+          }
+
           await whatsappService.sendMessage(
             customerPhone,
             `❌ Insufficient stock for ${product.name}.
+            
+            Available: Check current stock
+            Requested: ${item.quantity} units
 
-          Available: ${product.stockQuantity} units
-          Requested: ${item.quantity} units
-
-          Please reduce your order quantity and try again.`
+            Please try again with a lower quantity.`
           );
           return;
         }
+
+        stockReservations.push({ productId: item.productId, quantity: item.quantity });
       }
 
       // Check if customer has existing pending order
