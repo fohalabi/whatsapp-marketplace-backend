@@ -6,6 +6,7 @@ import { getSocketManager } from '../middleware/socket.middleware';
 import { OrderService } from '../services/customerOrder.service';
 import { PaystackService } from '../services/paystack.service';
 import { errorLogger, ErrorSeverity } from '../services/errorLogger.service';
+import { getIO } from '../config/socket';
 
 export class WhatsAppWebhookController {
   private orderService: OrderService;
@@ -241,7 +242,27 @@ export class WhatsAppWebhookController {
 
         stockReservations.push({ productId: item.productId, quantity: item.quantity });
       }
+      
+      const updatedProducts = await prisma.product.findMany({
+        where: {
+          id: { in: stockReservations.map(r => r.productId) }
+        },
+        select: {
+          id: true,
+          stockQuantity: true
+        }
+      });
 
+      // Emit socket event
+      try {
+        const io = getIO();
+        io.emit('stock-updated', {
+          products: updatedProducts
+        });
+      } catch (error) {
+        console.error('Socket emit error:', error);
+      }
+      
       // Check if customer has existing pending order
       const existingPendingOrder = await prisma.customerOrder.findFirst({
         where: {

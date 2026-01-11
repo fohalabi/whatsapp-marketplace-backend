@@ -246,3 +246,10 @@ export function initializeSocket(httpServer: any) {
   socketManager = new SocketManager(httpServer);
   return socketManager;
 }
+
+export function getIO(): Server {
+  if (!socketManager) {
+    throw new Error('Socket.IO not initialized. Call initializeSocket first.');
+  }
+  return socketManager['io'];
+}
