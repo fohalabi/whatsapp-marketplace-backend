@@ -5,6 +5,7 @@ import { whatsappService } from '../services/whatsapp.service';
 import { getSocketManager } from '../middleware/socket.middleware';
 import { OrderService } from '../services/customerOrder.service';
 import { PaystackService } from '../services/paystack.service';
+import { errorLogger, ErrorSeverity } from '../services/errorLogger.service';
 
 export class WhatsAppWebhookController {
   private orderService: OrderService;
@@ -33,18 +34,43 @@ export class WhatsAppWebhookController {
 
   receiveMessage = async (req: Request, res: Response) => {
     try {
-      // Verify signature in production
-      if (process.env.NODE_ENV === 'production' && process.env.WHATSAPP_WEBHOOK_SECRET) {
+      // Always verify signature if secret is configured
+      if (process.env.WHATSAPP_WEBHOOK_SECRET) {
         const signature = req.headers['x-hub-signature-256'] as string;
+        
+        if (!signature) {
+          console.error('❌ Missing webhook signature');
+          await errorLogger.logError({
+            service: 'WhatsAppWebhook',
+            action: 'verifySignature',
+            severity: ErrorSeverity.HIGH,
+            error: new Error('Missing X-Hub-Signature-256 header'),
+            context: { source: req.ip }
+          });
+          return res.sendStatus(403);
+        }
+
         const expectedSignature = crypto
           .createHmac('sha256', process.env.WHATSAPP_WEBHOOK_SECRET)
           .update(JSON.stringify(req.body))
           .digest('hex');
 
         if (signature !== `sha256=${expectedSignature}`) {
-          console.warn('⚠️ Invalid webhook signature');
+          console.error('❌ Invalid webhook signature');
+          await errorLogger.logError({
+            service: 'WhatsAppWebhook',
+            action: 'verifySignature',
+            severity: ErrorSeverity.CRITICAL,
+            error: new Error('Invalid webhook signature - possible attack'),
+            context: { 
+              source: req.ip,
+              receivedSignature: signature.substring(0, 20) + '...'
+            }
+          });
           return res.sendStatus(403);
         }
+      } else {
+        console.warn('⚠️ WHATSAPP_WEBHOOK_SECRET not configured - webhooks unprotected!');
       }
 
       // Acknowledge receipt immediately

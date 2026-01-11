@@ -32,8 +32,33 @@ export class PaystackWebhookController {
         .update(JSON.stringify(req.body))
         .digest('hex');
 
-      if (hash !== req.headers['x-paystack-signature']) {
-        console.log('Invalid signature');
+      const paystackSignature = req.headers['x-paystack-signature'] as string;
+
+      if (!paystackSignature) {
+        console.error('❌ Missing Paystack signature');
+        await errorLogger.logError({
+          service: 'PaystackWebhook',
+          action: 'verifySignature',
+          severity: ErrorSeverity.CRITICAL,
+          error: new Error('Missing X-Paystack-Signature header'),
+          context: { source: req.ip }
+        });
+        return res.sendStatus(400);
+      }
+
+      if (hash !== paystackSignature) {
+        console.error('❌ Invalid Paystack signature');
+        await errorLogger.logError({
+          service: 'PaystackWebhook',
+          action: 'verifySignature',
+          severity: ErrorSeverity.CRITICAL,
+          error: new Error('Invalid Paystack signature - possible attack'),
+          context: { 
+            source: req.ip,
+            event: req.body.event,
+            receivedSignature: paystackSignature.substring(0, 20) + '...'
+          }
+        });
         return res.sendStatus(400);
       }
 

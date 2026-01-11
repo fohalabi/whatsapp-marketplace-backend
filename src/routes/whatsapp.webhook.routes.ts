@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { WhatsAppWebhookController } from '../controllers/whatsapp.webhook.controller';
+import { webhookRateLimiter } from '../middleware/webhookRateLimit.middleware';
 
 const router = Router();
 const webhookController = new WhatsAppWebhookController();
@@ -8,6 +9,6 @@ const webhookController = new WhatsAppWebhookController();
 router.get('/webhook', (req, res) => webhookController.verifyWebhook(req, res));
 
 // POST for receiving messages
-router.post('/webhook', (req, res) => webhookController.receiveMessage(req, res));
+router.post('/webhook', webhookRateLimiter, (req, res) => webhookController.receiveMessage(req, res));
 
 export default router;

@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { PaystackWebhookController } from '../controllers/paystack.webhook.controller';
+import { paystackIPWhitelist } from '../middleware/webhookSecurity.middleware';
+import { webhookRateLimiter } from '../middleware/webhookRateLimit.middleware';
 
 const router = Router();
 const paystackWebhookController = new PaystackWebhookController();
 
-// Paystack webhook (no auth needed - Paystack calls this)
-router.post('/webhook', (req, res) => paystackWebhookController.handleWebhook(req, res));
+router.post('/webhook', webhookRateLimiter, paystackIPWhitelist, paystackWebhookController.handleWebhook);
 
 export default router;
