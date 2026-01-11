@@ -22,6 +22,7 @@ export interface CustomJWTPayload extends JWTPayload {
   id: string;
   email: string;
   role: Role;
+  merchantId?: string;
 }
 
 export interface AuthRequest extends Request {

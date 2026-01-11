@@ -29,6 +29,7 @@ import deliveryRoutes from './routes/delivery.routes';
 import broadcastRoutes from './routes/broadcast.routes';
 import { OrderCleanupJob } from './jobs/orderCleanup.job';
 import { DeliveryRetryJob } from './jobs/deliveryRetry.job';
+import orderManagementRoutes from './routes/orderManagement.routes';
 
 dotenv.config();
 
@@ -84,6 +85,7 @@ app.use('/api/payouts', payoutRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/rider', riderRoutes);
 app.use('/api/deliveries', deliveryRoutes);
+app.use('/api', orderManagementRoutes);
 
 app.use('/api/test', testRoutes);
 

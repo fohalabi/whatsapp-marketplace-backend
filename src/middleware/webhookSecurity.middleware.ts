@@ -7,10 +7,6 @@ const PAYSTACK_IPS = [
   '52.214.14.220'
 ];
 
-const WHATSAPP_IPS = [
-  // Add WhatsApp IP ranges if known
-];
-
 export const paystackIPWhitelist = async (
   req: Request,
   res: Response,

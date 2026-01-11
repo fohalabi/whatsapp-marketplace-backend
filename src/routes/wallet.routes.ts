@@ -13,4 +13,13 @@ router.post('/merchant/:merchantId/withdraw', authenticate, (req, res) => wallet
 // Platform wallet routes
 router.get('/platform', authenticate, (req, res) => walletController.getPlatformWallet(req, res));
 
+// Merchant dashboard data
+router.get('/merchant/:merchantId/dashboard', authenticate, (req, res) => walletController.getMerchantDashboardData(req, res));
+
+// Platform revenue
+router.get('/platform/revenue', authenticate, (req, res) => walletController.getPlatformRevenue(req, res));
+
+// Platform withdrawal
+router.post('/platform/withdraw', authenticate, (req, res) => walletController.withdrawFromPlatform(req, res));
+
 export default router;
