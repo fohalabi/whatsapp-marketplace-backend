@@ -57,11 +57,12 @@ export class PayoutController {
         });
       }
 
-      await payoutService.processBulkPayouts(merchantIds);
+      const results = await payoutService.processBulkPayouts(merchantIds);
 
       res.json({
         success: true,
-        message: `${merchantIds.length} payouts processed successfully`,
+        message: `Processed ${results.successful.length} of ${merchantIds.length} payouts`,
+        data: results
       });
     } catch (error: any) {
       res.status(400).json({

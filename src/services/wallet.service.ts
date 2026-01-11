@@ -20,15 +20,11 @@ export class WalletService {
   async creditMerchantWallet(merchantId: string, amount: number, orderId: string) {
     const wallet = await this.getOrCreateMerchantWallet(merchantId);
 
-    const newBalance = wallet.balance + amount;
-    const newTotalEarnings = wallet.totalEarnings + amount;
-
-    // Update wallet
-    await prisma.merchantWallet.update({
+    const updatedWallet = await prisma.merchantWallet.update({
       where: { id: wallet.id },
       data: {
-        balance: newBalance,
-        totalEarnings: newTotalEarnings,
+        balance: { increment: amount },
+        totalEarnings: { increment: amount }
       },
     });
 
@@ -38,50 +34,67 @@ export class WalletService {
         walletId: wallet.id,
         type: 'CREDIT',
         amount,
-        balanceAfter: newBalance,
+        balanceAfter: updatedWallet.balance,
         orderId,
         reference: `CREDIT_${Date.now()}_${orderId}`,
         description: `Earnings from order ${orderId}`,
       },
     });
 
-    console.log('Merchant wallet credited:', { merchantId, amount, newBalance });
+    console.log('Merchant wallet credited:', { merchantId, amount, newBalance: updatedWallet });
   }
 
   // Debit merchant wallet (withdrawal)
-  async debitMerchantWallet(merchantId: string, amount: number) {
+  async debitMerchantWallet(
+    merchantId: string, 
+    amount: number,
+    bankDetails: {
+      accountName: string;
+      accountNumber: string;
+      bankName: string;
+    }
+  ) {
     const wallet = await this.getOrCreateMerchantWallet(merchantId);
 
     if (wallet.balance < amount) {
       throw new Error('Insufficient wallet balance');
     }
 
-    const newBalance = wallet.balance - amount;
-    const newTotalWithdrawals = wallet.totalWithdrawals + amount;
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedWallet = await tx.merchantWallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: { decrement: amount },
+          totalWithdrawals: { increment: amount },
+        },
+      });
 
-    // Update wallet
-    await prisma.merchantWallet.update({
-      where: { id: wallet.id },
-      data: {
-        balance: newBalance,
-        totalWithdrawals: newTotalWithdrawals,
-      },
+      const transaction = await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          type: 'WITHDRAWAL',
+          amount,
+          balanceAfter: updatedWallet.balance,
+          reference: `WITHDRAWAL_${Date.now()}`,
+          description: `Withdrawal to ${bankDetails.bankName} - ${bankDetails.accountNumber}`,
+          metadata: {
+            bankAccountName: bankDetails.accountName,
+            bankAccountNumber: bankDetails.accountNumber,
+            bankName: bankDetails.bankName,
+          }
+        },
+      });
+
+      return { updatedWallet, transaction };
     });
 
-    // Record transaction
-    const transaction = await prisma.walletTransaction.create({
-      data: {
-        walletId: wallet.id,
-        type: 'WITHDRAWAL',
-        amount,
-        balanceAfter: newBalance,
-        reference: `WITHDRAWAL_${Date.now()}`,
-        description: `Withdrawal request`,
-      },
+    console.log('Merchant wallet debited:', { 
+      merchantId, 
+      amount, 
+      newBalance: result.updatedWallet.balance 
     });
-
-    console.log('Merchant wallet debited:', { merchantId, amount, newBalance });
-    return transaction;
+    
+    return result.transaction;
   }
 
   // Get merchant wallet balance
@@ -140,5 +153,35 @@ export class WalletService {
     }
 
     return wallet;
+  }
+
+  // Get merchant pending balance (escrow + payout)
+  async getMerchantPendingBalance(merchantId: string) {
+    const [escrowBalance, payoutBalance] = await Promise.all([
+      prisma.escrow.aggregate({
+        where: {
+          merchantId,
+          status: 'HELD',
+        },
+        _sum: {
+          amount: true,
+        },
+      }),
+      prisma.payout.aggregate({
+        where: {
+          merchantId,
+          status: 'PENDING',
+        },
+        _sum: {
+          amount: true,
+        },
+      }),
+    ]);
+
+    const totalPending = 
+      (escrowBalance._sum.amount || 0) + 
+      (payoutBalance._sum.amount || 0);
+
+    return totalPending;
   }
 }

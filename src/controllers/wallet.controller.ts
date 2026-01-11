@@ -60,7 +60,7 @@ export class WalletController {
   async requestWithdrawal(req: AuthRequest, res: Response) {
     try {
       const { merchantId } = req.params;
-      const { amount } = req.body;
+      const { amount, bankAccountName, bankAccountNumber, bankName } = req.body;
 
       if (!merchantId) {
         return res.status(400).json({
@@ -76,7 +76,18 @@ export class WalletController {
         });
       }
 
-      const transaction = await walletService.debitMerchantWallet(merchantId, amount);
+      if (!bankAccountName || !bankAccountNumber || !bankName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bank details are required',
+        });
+      }
+
+      const transaction = await walletService.debitMerchantWallet(
+        merchantId, 
+        amount,
+        { accountName: bankAccountName, accountNumber: bankAccountNumber, bankName }
+      );
 
       res.json({
         success: true,
@@ -90,7 +101,6 @@ export class WalletController {
       });
     }
   }
-
   // Platform wallet endpoints
   async getPlatformWallet(req: AuthRequest, res: Response) {
     try {

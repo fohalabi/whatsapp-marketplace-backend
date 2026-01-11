@@ -1,6 +1,13 @@
 import prisma from '../config/database';
+import { WalletService } from './wallet.service';
 
 export class EscrowService {
+  private walletService: WalletService;
+
+  constructor() {
+    this.walletService = new WalletService();
+  }
+
   async releaseEscrowToPayout(orderId: string) {
     const escrow = await prisma.escrow.findUnique({
       where: { orderId },
@@ -49,6 +56,8 @@ export class EscrowService {
         status: 'PENDING',
       },
     });
+
+    await this.walletService.updatePlatformWallet(platformCommission, 0);
 
     console.log('Escrow released:', { 
       orderId, 
