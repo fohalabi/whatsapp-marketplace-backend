@@ -789,6 +789,19 @@ model DeliveryEvent {
   @@map("delivery_events")
 }
 
+model ErrorLog {
+  id           String   @id @default(cuid())
+  service      String
+  action       String
+  severity     String
+  errorMessage String   @db.Text
+  errorStack   String?  @db.Text
+  context      String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  @@index([severity, createdAt])
+}
+
 enum Role {
   ADMIN
   MERCHANT

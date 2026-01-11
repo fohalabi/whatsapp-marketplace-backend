@@ -11,6 +11,7 @@ import {
   WhatsAppInteractiveMessage,
   WhatsAppAPIResponse
 } from '../types/whatsapp.types';
+import { errorLogger, ErrorSeverity } from './errorLogger.service';
 
 dotenv.config();
 
@@ -873,6 +874,14 @@ export class WhatsAppService {
 
     } catch (error: any) {
       console.error('❌ WhatsApp API Error:', error.response?.data?.error || error.message);
+
+      await errorLogger.logError({
+        service: 'WhatsAppService',
+        action: 'sendMessage',
+        severity: ErrorSeverity.MEDIUM,
+        error,
+        context: { phoneNumber: this.maskPhoneNumber(phoneNumber) }
+      });
 
       if (error.response?.status === 401) {
         const refreshed = await this.refreshToken();

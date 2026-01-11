@@ -8,6 +8,7 @@ import { getRedis } from '../config/redis';
 import prisma from '../config/database';
 import { DeliveryOrchestrator } from '../services/delivery/DeliveryOrchestrator.service';
 import { PaystackService } from '../services/paystack.service';
+import { errorLogger, ErrorSeverity } from '../services/errorLogger.service';
 
 const orderService = new OrderService();
 const whatsappService = new WhatsAppService();
@@ -87,10 +88,16 @@ export class PaystackWebhookController {
     const stockCheck = await this.validateStockAvailability(order.id);
 
     if (!stockCheck.available) {
-      console.error('⚠️ Insufficient stock at payment time', {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        issues: stockCheck.issues
+      await errorLogger.logError({
+        service: 'PaystackWebhook',
+        action: 'stockValidation',
+        severity: ErrorSeverity.HIGH,
+        error: new Error('Insufficient stock at payment time'),
+        context: {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          issues: stockCheck.issues
+        }
       });
 
       // Initiate refund
@@ -143,6 +150,20 @@ export class PaystackWebhookController {
           status: 'HELD',
         },
       });
+    }).catch(async (error) => {
+      await errorLogger.logError({
+        service: 'PaystackWebhook',
+        action: 'handleSuccessfulPayment',
+        severity: ErrorSeverity.CRITICAL,
+        error,
+        context: {
+          reference,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          amount: amountPaid
+        }
+      });
+      throw error;
     });
 
     // Invoice generation with retry (outside transaction)
@@ -153,6 +174,14 @@ export class PaystackWebhookController {
       pdfUrl = result.pdfUrl;
     } catch (error: any) {
       console.error('⚠️ Invoice generation failed after retries:', error.message);
+
+      await errorLogger.logError({
+        service: 'InvoiceService',
+        action: 'createInvoice',
+        severity: ErrorSeverity.HIGH,
+        error,
+        context: { orderId: order.id, orderNumber: order.orderNumber }
+      });
       
       await prisma.activityLog.create({
         data: {
@@ -205,6 +234,14 @@ export class PaystackWebhookController {
       console.log('✅ Delivery created for order:', order.orderNumber);
     } catch (error: any) {
       console.error('⚠️ Delivery creation failed:', error.message);
+
+      await errorLogger.logError({
+        service: 'DeliveryOrchestrator',
+        action: 'createDelivery',
+        severity: ErrorSeverity.HIGH,
+        error, 
+        context: { orderId: order.id, orderNumber: order.orderNumber }
+      });
     }
 
     console.log('Payment confirmed:', { reference, amountPaid });
