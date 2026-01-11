@@ -1,6 +1,13 @@
 import prisma from '../config/database';
+import { PaystackService } from './paystack.service';
 
 export class WalletService {
+  private paystackService: PaystackService;
+
+  constructor() {
+    this.paystackService = new PaystackService();
+  }
+
   // Get or create merchant wallet
   async getOrCreateMerchantWallet(merchantId: string) {
     let wallet = await prisma.merchantWallet.findUnique({
@@ -88,12 +95,77 @@ export class WalletService {
       return { updatedWallet, transaction };
     });
 
+    // Get bank code and initiate Paystack transfer
+    try {
+      const bankCode = await this.paystackService.getBankCodeByName(bankDetails.bankName);
+      
+      // Verify account first
+      const verification = await this.paystackService.verifyAccountNumber(
+        bankDetails.accountNumber,
+        bankCode
+      );
+
+      if (verification.account_name.toLowerCase() !== bankDetails.accountName.toLowerCase()) {
+        throw new Error('Account name mismatch');
+      }
+
+      const recipient = await this.paystackService.createTransferRecipient(
+        bankDetails.accountNumber,
+        bankCode,
+        bankDetails.accountName
+      );
+
+      await this.paystackService.initiateTransfer(
+        amount,
+        recipient.recipient_code,
+        bankCode,
+        bankDetails.accountName,
+        result.transaction.reference,
+        'Merchant withdrawal'
+      );
+
+      console.log('Paystack transfer initiated:', result.transaction.reference);
+    } catch (error: any) {
+      console.error('Paystack transfer failed:', error.message);
+      
+      // Rollback wallet debit
+      await prisma.merchantWallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: { increment: amount },
+          totalWithdrawals: { decrement: amount },
+        },
+      });
+
+      // Delete failed transaction
+      await prisma.walletTransaction.delete({
+        where: { id: result.transaction.id }
+      });
+
+      throw new Error(`Bank transfer failed: ${error.message}`);
+    }
+
+    // Log activity for admin tracking
+    await prisma.activityLog.create({
+      data: {
+        userId: merchantId,
+        action: 'merchant_withdrawal',
+        description: `Withdrawal of ${amount} to ${bankDetails.bankName}`,
+        metadata: {
+          amount,
+          bankDetails,
+          transactionId: result.transaction.id,
+          reference: result.transaction.reference
+        }
+      }
+    });
+
     console.log('Merchant wallet debited:', { 
       merchantId, 
       amount, 
       newBalance: result.updatedWallet.balance 
     });
-    
+
     return result.transaction;
   }
 
@@ -183,5 +255,49 @@ export class WalletService {
       (payoutBalance._sum.amount || 0);
 
     return totalPending;
+  }
+
+  // Admin withdrawal from platform wallet
+  async debitPlatformWallet(
+    adminId: string,
+    amount: number,
+    bankDetails: {
+      accountName: string;
+      accountNumber: string;
+      bankName: string;
+    }
+  ) {
+    const platformWallet = await this.getPlatformWallet();
+
+    if (platformWallet.currentBalance < amount) {
+      throw new Error('Insufficient platform balance');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.platformWallet.update({
+        where: { id: platformWallet.id },
+        data: {
+          currentBalance: { decrement: amount },
+          totalPayouts: { increment: amount },
+        },
+      });
+
+      // Log activity
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'platform_withdrawal',
+          description: `Platform withdrawal of ${amount} to ${bankDetails.bankName}`,
+          metadata: {
+            amount,
+            bankDetails,
+            reference: `PLATFORM_WD_${Date.now()}`
+          }
+        }
+      });
+    });
+
+    console.log('Platform wallet debited:', { adminId, amount });
+    return { success: true, amount };
   }
 }

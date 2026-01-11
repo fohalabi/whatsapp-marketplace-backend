@@ -101,6 +101,7 @@ export class WalletController {
       });
     }
   }
+
   // Platform wallet endpoints
   async getPlatformWallet(req: AuthRequest, res: Response) {
     try {
@@ -112,6 +113,106 @@ export class WalletController {
       });
     } catch (error: any) {
       res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async getMerchantDashboardData(req: AuthRequest, res: Response) {
+    try {
+      const { merchantId } = req.params;
+
+      if (!merchantId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Merchant ID is required',
+        });
+      }
+
+      const [wallet, pendingBalance, transactions] = await Promise.all([
+        walletService.getOrCreateMerchantWallet(merchantId),
+        walletService.getMerchantPendingBalance(merchantId),
+        walletService.getMerchantTransactions(merchantId, 10)
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          availableBalance: wallet.balance,
+          pendingBalance,
+          totalEarnings: wallet.totalEarnings,
+          totalWithdrawals: wallet.totalWithdrawals,
+          recentTransactions: transactions
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async getPlatformRevenue(req: AuthRequest, res: Response) {
+    try {
+      const platformWallet = await walletService.getPlatformWallet();
+
+      res.json({
+        success: true,
+        data: {
+          totalRevenue: platformWallet.totalRevenue,
+          totalPayouts: platformWallet.totalPayouts,
+          currentBalance: platformWallet.currentBalance,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async withdrawFromPlatform(req: AuthRequest, res: Response) {
+    try {
+      const { amount, bankAccountName, bankAccountNumber, bankName } = req.body;
+      const adminId = req.user?.id;
+
+      if (!adminId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized',
+        });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid amount is required',
+        });
+      }
+
+      if (!bankAccountName || !bankAccountNumber || !bankName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bank details are required',
+        });
+      }
+
+      const result = await walletService.debitPlatformWallet(
+        adminId,
+        amount,
+        { accountName: bankAccountName, accountNumber: bankAccountNumber, bankName }
+      );
+
+      res.json({
+        success: true,
+        message: 'Platform withdrawal processed successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      res.status(400).json({
         success: false,
         message: error.message,
       });
