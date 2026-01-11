@@ -297,6 +297,53 @@ export class WalletService {
       });
     });
 
+    // Get bank code and initiate Paystack transfer
+    try {
+      const bankCode = await this.paystackService.getBankCodeByName(bankDetails.bankName);
+      
+      // Verify account first
+      const verification = await this.paystackService.verifyAccountNumber(
+        bankDetails.accountNumber,
+        bankCode
+      );
+
+      if (verification.account_name.toLowerCase() !== bankDetails.accountName.toLowerCase()) {
+        throw new Error('Account name mismatch');
+      }
+
+      const recipient = await this.paystackService.createTransferRecipient(
+        bankDetails.accountNumber,
+        bankCode,
+        bankDetails.accountName
+      );
+
+      const reference = `PLATFORM_WD_${Date.now()}`;
+
+      await this.paystackService.initiateTransfer(
+        amount,
+        recipient.recipient_code,
+        bankCode,
+        bankDetails.accountName,
+        reference,
+        'Platform withdrawal'
+      );
+
+      console.log('Platform transfer initiated:', reference);
+    } catch (error: any) {
+      console.error('Platform transfer failed:', error.message);
+      
+      // Rollback platform wallet debit
+      await prisma.platformWallet.update({
+        where: { id: platformWallet.id },
+        data: {
+          currentBalance: { increment: amount },
+          totalPayouts: { decrement: amount },
+        },
+      });
+
+      throw new Error(`Bank transfer failed: ${error.message}`);
+    }
+
     console.log('Platform wallet debited:', { adminId, amount });
     return { success: true, amount };
   }
