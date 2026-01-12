@@ -32,6 +32,7 @@ import { DeliveryRetryJob } from './jobs/deliveryRetry.job';
 import orderManagementRoutes from './routes/orderManagement.routes';
 import walletRoutes from './routes/wallet.routes';
 import fulfullmentRoutes from './routes/fulfillment.routes';
+import merchantStockRoutes from './routes/merchantStock.routes';
 
 dotenv.config();
 
@@ -90,6 +91,7 @@ app.use('/api/deliveries', deliveryRoutes);
 app.use('/api', orderManagementRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('api', fulfullmentRoutes);
+app.use('/api', merchantStockRoutes);
 
 app.use('/api/test', testRoutes);
 
