@@ -20,8 +20,22 @@ export class AuthService {
                 email: data.email,
                 password: hashedPassword,
                 role: data.role || 'MERCHANT',
+                ...(data.role === 'MERCHANT' && {
+                    merchant: {
+                        create: {
+                            businessName: 'My Business',
+                            category: 'General',
+                            location: 'Nigeria',
+                            phone: data.email,
+                        }
+                    }
+                })
             },
+
+            include: { merchant: true }
         });
+
+        const merchantId = user.merchant?. id;
 
         const payload: JWTPayload = {
             userId: user.id,
@@ -36,6 +50,7 @@ export class AuthService {
                 id: user.id,
                 email: user.email,
                 role: user.role,
+                merchantId,
             },
             token
         };
@@ -68,11 +83,24 @@ export class AuthService {
 
         const token = generateToken(payload);
 
+        let merchantId = undefined;
+
+        if (user.role === 'MERCHANT') {
+            const merchant = await prisma.merchant.findUnique({
+                where: { userId: user.id },
+                select: { id: true }
+            });
+            merchantId = merchant?.id;
+        }
+        console.log('Found merchantId:', merchantId);
+        console.log('Merchant data:', await prisma.merchant.findMany({ where: { userId: user.id } }));
+
         return {
             user: {
                 id: user.id,
                 email: user.email,
                 role: user.role,
+                merchantId,
             },
             token,
         };
@@ -88,7 +116,7 @@ export class AuthService {
 
         // Check existing
         const existing = await prisma.user.findFirst({
-            where: { OR: [{ email }, { phone }] },
+            where: { email },
         });
 
         if (existing) {
@@ -100,21 +128,20 @@ export class AuthService {
         // Create user + rider
         const user = await prisma.user.create({
             data: {
-            email,
-            phone,
-            password: hashedPassword,
-            role: 'RIDER',
-            rider: {
-                create: {
-                firstName,
-                lastName,
-                phone,
                 email,
-                vehicleType,
-                vehicleNumber,
-                licensePlate,
+                password: hashedPassword,
+                role: 'RIDER',
+                rider: {
+                    create: {
+                        firstName,
+                        lastName,
+                        phone,
+                        email,
+                        vehicleType,
+                        vehicleNumber,
+                        licensePlate,
+                    },
                 },
-            },
             },
             include: { rider: true },
         });
