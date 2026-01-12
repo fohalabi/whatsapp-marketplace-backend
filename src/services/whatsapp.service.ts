@@ -183,7 +183,7 @@ export class WhatsAppService {
     this.checkTokenHealth().catch(console.error);
     this.startTokenMonitor();
 
-   // console.log(`✅ WhatsApp Service initialized for Phone ID: ${this.phoneId}`);
+   console.log(`✅ WhatsApp Service initialized for Phone ID: ${this.phoneId}`);
   }
 
   private setupInterceptors() {
@@ -218,7 +218,7 @@ export class WhatsAppService {
   async checkTokenHealth(): Promise<void> {
     try {
       await this.axiosInstance.get(`/${this.phoneId}?fields=id`);
-      // console.log('✅ Token is valid');
+      console.log('✅ Token is valid');
 
       if (!this.tokenInfo.expiresAt) {
         const estimatedExpiry = Math.floor(Date.now() / 1000) + (55 * 24 * 60 * 60);
