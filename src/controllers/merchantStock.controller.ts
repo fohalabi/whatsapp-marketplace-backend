@@ -8,7 +8,7 @@ export class MerchantStockController {
   // Get all merchant products
   async getMerchantProducts(req: AuthRequest, res: Response) {
     try {
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.userId;
 
       if (!merchantId) {
         return res.status(403).json({
@@ -35,7 +35,7 @@ export class MerchantStockController {
   async getProductById(req: AuthRequest, res: Response) {
     try {
       const { productId } = req.params;
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.userId;
 
       if (!merchantId) {
         return res.status(403).json({
@@ -70,7 +70,7 @@ export class MerchantStockController {
     try {
       const { productId } = req.params;
       const { stock } = req.body;
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.userId;
 
       if (!merchantId) {
         return res.status(403).json({
@@ -116,7 +116,7 @@ export class MerchantStockController {
   async bulkUpdateStock(req: AuthRequest, res: Response) {
     try {
       const { updates } = req.body;
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.userId;
 
       if (!merchantId) {
         return res.status(403).json({
@@ -150,7 +150,7 @@ export class MerchantStockController {
   // Get stock stats
   async getStockStats(req: AuthRequest, res: Response) {
     try {
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.userId;
 
       if (!merchantId) {
         return res.status(403).json({
