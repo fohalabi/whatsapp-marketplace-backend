@@ -33,6 +33,8 @@ import orderManagementRoutes from './routes/orderManagement.routes';
 import walletRoutes from './routes/wallet.routes';
 import fulfullmentRoutes from './routes/fulfillment.routes';
 import merchantStockRoutes from './routes/merchantStock.routes';
+import { startAutoReleaseJob } from './jobs/autoReleaseEscrow.job';
+import { start } from 'repl';
 
 dotenv.config();
 
@@ -142,6 +144,7 @@ httpServer.listen(PORT, () => {
   console.log(`🌐 App URL: ${process.env.APP_URL || 'http://localhost:3001'}`);
   console.log(`📡 Socket.IO endpoint: ws://localhost:${PORT}`);
   startPaymentTimeoutJob();
+  startAutoReleaseJob();
 });
 
 // Handle server shutdown gracefully

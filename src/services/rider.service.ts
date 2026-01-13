@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { WhatsAppService } from './whatsapp.service';
 
 export class RiderService {
   async getRiderProfile(userId: string) {
@@ -100,6 +101,40 @@ export class RiderService {
         }),
       },
     });
+
+    if (status === 'DELIVERED') {
+      // Fetch delivery with order
+      const deliveryWithOrder = await prisma.delivery.findUnique({
+        where: { id: deliveryId },
+        include: { order: true }
+      });
+
+      if (!deliveryWithOrder) throw new Error('Delivery not found');
+
+      await prisma.delivery.update({
+        where: { id: deliveryId },
+        data: {
+          confirmationRequestedAt: new Date(),
+          autoReleaseAt: new Date(Date.now() + 48 * 60 * 60 * 1000)
+        }
+      });
+
+      // Send confirmation request to customer
+      const whatsappService = new WhatsAppService();
+      await whatsappService.sendInteractiveButtons(
+        deliveryWithOrder.order.customerPhone,
+        `✅ Your order has been delivered!
+
+    Order: ${deliveryWithOrder.order.orderNumber}
+    Delivery: ${deliveryWithOrder.deliveryNumber}
+
+    Please confirm you received your order in good condition.`,
+        [
+          { id: 'confirm_delivery', title: '✅ Confirm Delivery' },
+          { id: 'report_issue', title: '⚠️ Report Issue' }
+        ]
+      );
+    }
 
     // Log event
     await prisma.deliveryEvent.create({

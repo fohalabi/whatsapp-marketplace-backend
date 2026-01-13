@@ -8,6 +8,7 @@ import { PaystackService } from '../services/paystack.service';
 import { errorLogger, ErrorSeverity } from '../services/errorLogger.service';
 import { getIO } from '../config/socket';
 import { calculateDeliveryFee, getDeliveryFeeDescription } from '../utils/deliveryFee.utils';
+import { EscrowService } from '../services/escrow.service';
 
 export class WhatsAppWebhookController {
   private orderService: OrderService;
@@ -119,6 +120,11 @@ export class WhatsAppWebhookController {
     // Check if it's an order from catalog
     if (type === 'order') {
       await this.handleOrder(value);
+      return;
+    }
+
+    if (type === 'interactive') {
+      await this.handleInteractiveReply(message, from);
       return;
     }
 
@@ -303,7 +309,7 @@ export class WhatsAppWebhookController {
         merchantId,
         orderId
       );
-      
+
       console.log('Order created:', { customerPhone, subtotal });
 
       // Ask for email
@@ -532,5 +538,119 @@ export class WhatsAppWebhookController {
 
       Payment expires in 30 minutes.`
     );
+  }
+
+  private async handleInteractiveReply(message: any, customerPhone: string) {
+    const buttonReply = message.interactive?.button_reply;
+
+    if (!buttonReply) return;
+
+    const buttonId = buttonReply.id;
+
+    if (buttonId === 'confirm_delivery') {
+      await this.handleDeliveryConfirmation(customerPhone);
+    } else if (buttonId === 'report_issue') {
+      await this.handleDeliveryIssue(customerPhone);
+    }
+  }
+
+  private async handleDeliveryConfirmation(customerPhone: string) {
+    const delivery = await prisma.delivery.findFirst({
+      where: {
+        order: { customerPhone },
+        status: 'DELIVERED',
+        customerConfirmed: false
+      },
+      include: { order: true },
+      orderBy: { deliveredAt: 'desc' }
+    });
+
+    if (!delivery) {
+      await whatsappService.sendMessage(
+        customerPhone,
+        '❌ No pending delivery confirmation found.'
+      );
+      return;
+    }
+
+    // Update delivery and order
+    await prisma.$transaction([
+      prisma.delivery.update({
+        where: { id: delivery.id },
+        data: {
+          customerConfirmed: true,
+          confirmationRespondedAt: new Date()
+        }
+      }),
+      prisma.customerOrder.update({
+        where: { id: delivery.orderId },
+        data: {
+          deliveryConfirmed: true,
+          deliveryConfirmedAt: new Date()
+        }
+      })
+    ]);
+
+    // Release escrow
+    const escrowService = new EscrowService();
+    await escrowService.releaseEscrowToPayout(delivery.orderId);
+
+    // Notify customer
+    await whatsappService.sendMessage(
+      customerPhone,
+      `✅ Delivery Confirmed!
+
+      Order: ${delivery.order.orderNumber}
+
+      Thank you for confirming. Payment has been released to the merchant.
+
+      We hope to serve you again! 🎉`
+    );
+
+    console.log('✅ Delivery confirmed by customer:', delivery.deliveryNumber);
+    
+  }
+
+  private async handleDeliveryIssue(customerPhone: string) {
+    // Find delivery
+    const delivery = await prisma.delivery.findFirst({
+      where: {
+        order: { customerPhone },
+        status: 'DELIVERED',
+        customerConfirmed: false
+      },
+      include: { order: true },
+      orderBy: { deliveredAt: 'desc' }
+    });
+
+    if (!delivery) return;
+
+    // Log issue for admin review
+    await prisma.activityLog.create({
+      data: {
+        userId: 'SYSTEM',
+        action: 'delivery_issue_reported',
+        description: `Customer reported issue with delivery ${delivery.deliveryNumber}`,
+        metadata: {
+          deliveryId: delivery.id,
+          orderId: delivery.orderId,
+          customerPhone
+        }
+      }
+    });
+
+    // Notify customer
+    await whatsappService.sendMessage(
+      customerPhone,
+      `⚠️ Issue Reported
+
+  Order: ${delivery.order.orderNumber}
+
+  Our support team will contact you shortly to resolve this issue.
+
+  Payment is on hold until resolution.`
+    );
+
+    console.log('⚠️ Delivery issue reported:', delivery.deliveryNumber);
   }
 }

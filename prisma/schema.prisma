@@ -264,6 +264,9 @@ model CustomerOrder {
 
   invoice         Invoice?
   paymentExpiresAt    DateTime?
+  
+  deliveryConfirmed       Boolean   @default(false)
+  deliveryConfirmedAt     DateTime?
 
   merchant   Merchant @relation(fields: [merchantId], references: [id])
 
@@ -776,6 +779,11 @@ model Delivery {
   
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  customerConfirmed       Boolean   @default(false)
+  customerConfirmedAt     DateTime?
+  confirmationRequestedAt DateTime?
+  autoReleaseAt           DateTime?  
   
   @@map("deliveries")
 }
