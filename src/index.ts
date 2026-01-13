@@ -35,6 +35,7 @@ import fulfullmentRoutes from './routes/fulfillment.routes';
 import merchantStockRoutes from './routes/merchantStock.routes';
 import { startAutoReleaseJob } from './jobs/autoReleaseEscrow.job';
 import { start } from 'repl';
+import riderApprovalRoutes from './routes/riderAppoval.routes';
 
 dotenv.config();
 
@@ -94,6 +95,7 @@ app.use('/api', orderManagementRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('api', fulfullmentRoutes);
 app.use('/api', merchantStockRoutes);
+app.use('/api/riders/approval', riderApprovalRoutes);
 
 app.use('/api/test', testRoutes);
 

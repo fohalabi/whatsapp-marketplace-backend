@@ -26,6 +26,11 @@ export class RiderService {
 
     if (!rider) throw new Error('Rider not found');
 
+    // Block unapproved riders from going online
+    if (status === 'AVAILABLE' && rider.approvalStatus !== 'APPROVED') {
+      throw new Error('Your account is pending approval. Please wait for admin approval.');
+    }
+
     return await prisma.rider.update({
       where: { id: rider.id },
       data: { status },

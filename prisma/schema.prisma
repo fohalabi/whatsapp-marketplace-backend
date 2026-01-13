@@ -728,6 +728,11 @@ model Rider {
   vehicleType       String
   vehicleNumber     String?
   licensePlate      String?
+
+  approvalStatus    String        @default("PENDING")
+  rejectionReason   String?
+  approvedBy        String?
+  approvedAt        DateTime?
   
   status            RiderStatus  @default(OFFLINE)
   currentLatitude   Float?
