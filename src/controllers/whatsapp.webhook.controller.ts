@@ -7,6 +7,7 @@ import { OrderService } from '../services/customerOrder.service';
 import { PaystackService } from '../services/paystack.service';
 import { errorLogger, ErrorSeverity } from '../services/errorLogger.service';
 import { getIO } from '../config/socket';
+import { calculateDeliveryFee, getDeliveryFeeDescription } from '../utils/deliveryFee.utils';
 
 export class WhatsAppWebhookController {
   private orderService: OrderService;
@@ -282,7 +283,7 @@ export class WhatsAppWebhookController {
       }
 
       // Calculate total
-      const totalAmount = items.reduce((sum: number, item: any) =>
+      const subtotal = items.reduce((sum: number, item: any) =>
         sum + (item.price * item.quantity), 0
       );
 
@@ -297,27 +298,19 @@ export class WhatsAppWebhookController {
         customerPhone,
         customerEmail,
         items,
-        totalAmount,
+        subtotal,
         paymentReference,
         merchantId,
         orderId
       );
-
-      // Initialize Paystack payment
-      const payment = await this.paystackService.initializePayment(
-        customerEmail,
-        totalAmount,
-        paymentReference,
-        createdOrder.id
-      );
-
-      console.log('Order created:', { customerPhone, totalAmount });
+      
+      console.log('Order created:', { customerPhone, subtotal });
 
       // Ask for email
       const emailRequestMessage = `
         ✅ Order Received! 
         Order Number: ${createdOrder.orderNumber}
-        Total Amount: ₦${totalAmount.toLocaleString()}
+        Total Amount: ₦${subtotal.toLocaleString()}
 
         📧 Please reply with your email address to receive your receipt and invoice.
 
@@ -328,7 +321,7 @@ export class WhatsAppWebhookController {
        📍 Delivery Location Required
         
         Order: ${createdOrder.orderNumber}
-        Total: ₦${totalAmount.toLocaleString()}
+        Total: ₦${subtotal.toLocaleString()}
         
         Please share your delivery location:
         
@@ -413,29 +406,54 @@ export class WhatsAppWebhookController {
         status: 'PENDING',
         deliveryAddress: null
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        merchant: true
+      }
     });
 
     if (!order) {
       await whatsappService.sendMessage(
         customerPhone,
-        '❌ No pending order found. Please place an order first.'
+        '❌ No pending order found. Please place an order first'
       );
       return;
     }
 
-    // Update order with location
-    await prisma.customerOrder.update({
+    // Get merchant location
+    if (!order.merchant.latitude || !order.merchant.longitude) {
+      await whatsappService.sendMessage(
+        customerPhone,
+        '❌ Merchant location not set. Contact support.'
+      );
+      return;
+    }
+
+    // Calculate delivery fee
+    const deliveryFee = calculateDeliveryFee(
+      { latitude: order.merchant.latitude, longitude: order.merchant.longitude },
+      { latitude, longitude }
+    );
+
+    const deliveryDescription = getDeliveryFeeDescription(
+      { latitude: order.merchant.latitude, longitude: order.merchant.longitude },
+      { latitude, longitude }
+    );
+
+    // Update order with location and delivery fee
+    const updatedOrder = await prisma.customerOrder.update({
       where: { id: order.id },
       data: {
         deliveryAddress: `Lat: ${latitude}, Long: ${longitude}`,
         deliveryLatitude: latitude,
-        deliveryLongitude: longitude
+        deliveryLongitude: longitude,
+        deliveryFee: deliveryFee,
+        totalAmount: order.totalAmount + deliveryFee 
       }
     });
 
     // Send payment link
-    await this.sendPaymentLink(order, customerPhone);
+    await this.sendPaymentLink(updatedOrder, customerPhone, deliveryFee, deliveryDescription);
   }
 
   private async handleAddressText(customerPhone: string, address: string, order: any) {
@@ -448,27 +466,54 @@ export class WhatsAppWebhookController {
       return;
     }
 
-    // Update order with text address (you'd geocode this later)
-    await prisma.customerOrder.update({
+    // Get merchant with location
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: order.merchantId }
+    });
+
+    if (!merchant || !merchant.latitude || !merchant.longitude) {
+      await whatsappService.sendMessage(
+        customerPhone,
+        '❌ Merchant location not set. Please contact support.'
+      );
+      return;
+    }
+    // For text address, use fallback location (ideally geocode later)
+    const fallbackLocation = { latitude: 6.5355, longitude: 3.3087 };
+    
+    // Calculate delivery fee
+    const deliveryFee = calculateDeliveryFee(
+      { latitude: merchant.latitude, longitude: merchant.longitude },
+      fallbackLocation
+    );
+
+    const deliveryDescription = getDeliveryFeeDescription(
+      { latitude: merchant.latitude, longitude: merchant.longitude },
+      fallbackLocation
+    );
+
+    // Update order with address and delivery fee
+    const updatedOrder = await prisma.customerOrder.update({
       where: { id: order.id },
       data: {
         deliveryAddress: address,
-        // TODO: Geocode address to get lat/long
-        deliveryLatitude: 6.5355, // Fallback to default
-        deliveryLongitude: 3.3087
+        deliveryLatitude: fallbackLocation.latitude,
+        deliveryLongitude: fallbackLocation.longitude,
+        deliveryFee: deliveryFee,
+        totalAmount: order.totalAmount + deliveryFee
       }
     });
 
     // Send payment link
-    await this.sendPaymentLink(order, customerPhone);
+    await this.sendPaymentLink(updatedOrder, customerPhone, deliveryFee, deliveryDescription);
   }
 
-  private async sendPaymentLink(order: any, customerPhone: string) {
+  private async sendPaymentLink(order: any, customerPhone: string, deliveryFee: number, deliveryDescription: string) {
     const paystackService = new PaystackService();
     
     const payment = await paystackService.initializePayment(
       order.customerEmail,
-      order.totalAmount,
+      order.totalAmount, // Now includes delivery fee
       order.paymentReference,
       order.id
     );
@@ -478,7 +523,9 @@ export class WhatsAppWebhookController {
       `✅ Location Received!
 
       Order: ${order.orderNumber}
-      Amount: ₦${order.totalAmount.toLocaleString()}
+      Subtotal: ₦${(order.totalAmount - deliveryFee).toLocaleString()}
+      Delivery Fee (${deliveryDescription}): ₦${deliveryFee.toLocaleString()}
+      Total Amount: ₦${order.totalAmount.toLocaleString()}
 
       💳 Complete Payment:
       ${payment.authorization_url}

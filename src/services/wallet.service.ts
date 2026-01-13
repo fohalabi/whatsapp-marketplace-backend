@@ -347,4 +347,42 @@ export class WalletService {
     console.log('Platform wallet debited:', { adminId, amount });
     return { success: true, amount };
   }
+
+  // Get all merchant wallets for admin
+  async getAllMerchantWallets() {
+    const wallets = await prisma.merchantWallet.findMany({
+      include: {
+        merchant: {
+          include: {
+            user: {
+              select: {
+                email: true,
+                phone: true
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            transactions: true
+          }
+        }
+      },
+      orderBy: { balance: 'desc' }
+    });
+
+    return wallets.map(wallet => ({
+      id: wallet.id,
+      merchantId: wallet.merchantId,
+      merchantName: wallet.merchant.businessName,
+      phone: wallet.merchant.phone,
+      email: wallet.merchant.user.email,
+      balance: wallet.balance,
+      totalEarnings: wallet.totalEarnings,
+      totalWithdrawals: wallet.totalWithdrawals,
+      transactionCount: wallet._count.transactions,
+      createdAt: wallet.createdAt,
+      updatedAt: wallet.updatedAt
+    }));
+  }
 }

@@ -22,4 +22,6 @@ router.get('/platform/revenue', authenticate, (req, res) => walletController.get
 // Platform withdrawal
 router.post('/platform/withdraw', authenticate, (req, res) => walletController.withdrawFromPlatform(req, res));
 
+// Get all merchant wallets
+router.get('/merchants/all', authenticate, (req, res) => walletController.getAllMerchnatWallets(req, res));
 export default router;

@@ -218,4 +218,20 @@ export class WalletController {
       });
     }
   }
+
+  async getAllMerchnatWallets(req: AuthRequest, res: Response) {
+    try {
+      const wallets = await walletService.getAllMerchantWallets();
+
+      res.json({
+        success: true,
+        data: wallets,
+      })
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 }
