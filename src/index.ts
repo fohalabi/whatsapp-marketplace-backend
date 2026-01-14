@@ -93,12 +93,12 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/riders/approval', riderApprovalRoutes);
 app.use('/api/rider', riderRoutes);
 app.use('/api/deliveries', deliveryRoutes);
-app.use('/api/orders', orderManagementRoutes);
+app.use('/api/order-management', orderManagementRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/fulfillment', fulfullmentRoutes);
 app.use('/api/stock', merchantStockRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
-app.use('api', fulfullmentRoutes);
+app.use('/api/fulfillment', fulfullmentRoutes);
 app.use('/api', merchantStockRoutes);
 
 
