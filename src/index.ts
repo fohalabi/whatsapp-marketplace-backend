@@ -37,6 +37,7 @@ import adminDashboardRoutes from './routes/adminDashboard.routes';
 import { startAutoReleaseJob } from './jobs/autoReleaseEscrow.job';
 import { start } from 'repl';
 import riderApprovalRoutes from './routes/riderApproval.routes';
+import riderWalletRoutes from './routes/riderWallet.routes';
 
 dotenv.config();
 
@@ -100,6 +101,7 @@ app.use('/api/stock', merchantStockRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/fulfillment', fulfullmentRoutes);
 app.use('/api', merchantStockRoutes);
+app.use('/api/rider/wallet', riderWalletRoutes);
 
 
 app.use('/api/test', testRoutes);
