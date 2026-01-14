@@ -9,6 +9,8 @@ import { errorLogger, ErrorSeverity } from '../services/errorLogger.service';
 import { getIO } from '../config/socket';
 import { calculateDeliveryFee, getDeliveryFeeDescription } from '../utils/deliveryFee.utils';
 import { EscrowService } from '../services/escrow.service';
+import { geocodeAddress, FALLBACK_LOCATION } from '../utils/geocoding.utils';
+import encryptionService from '../utils/encryption.utils';
 
 export class WhatsAppWebhookController {
   private orderService: OrderService;
@@ -116,6 +118,9 @@ export class WhatsAppWebhookController {
 
     const { from, type, id: messageId, timestamp } = message;
     console.log(`📱 New ${type} message from ${from}`);
+
+    // Check if first-time customer and send welcome
+    await this.checkAndSendWelcome(from);
 
     // Check if it's an order from catalog
     if (type === 'order') {
@@ -484,27 +489,31 @@ export class WhatsAppWebhookController {
       );
       return;
     }
-    // For text address, use fallback location (ideally geocode later)
-    const fallbackLocation = { latitude: 6.5355, longitude: 3.3087 };
+   // Geocode address to get real coordinates
+   const geocoded = await geocodeAddress(address);
+   const location = geocoded || FALLBACK_LOCATION; 
     
+    // use geocoded formatted address if available
+    const finalAddress = geocoded?.formattedAddress || address;
+
     // Calculate delivery fee
     const deliveryFee = calculateDeliveryFee(
       { latitude: merchant.latitude, longitude: merchant.longitude },
-      fallbackLocation
+      location
     );
 
     const deliveryDescription = getDeliveryFeeDescription(
       { latitude: merchant.latitude, longitude: merchant.longitude },
-      fallbackLocation
+      location
     );
 
     // Update order with address and delivery fee
     const updatedOrder = await prisma.customerOrder.update({
       where: { id: order.id },
       data: {
-        deliveryAddress: address,
-        deliveryLatitude: fallbackLocation.latitude,
-        deliveryLongitude: fallbackLocation.longitude,
+        deliveryAddress: finalAddress,
+        deliveryLatitude: location.latitude,
+        deliveryLongitude: location.longitude,
         deliveryFee: deliveryFee,
         totalAmount: order.totalAmount + deliveryFee
       }
@@ -652,5 +661,49 @@ export class WhatsAppWebhookController {
     );
 
     console.log('⚠️ Delivery issue reported:', delivery.deliveryNumber);
+  }
+
+  private async checkAndSendWelcome(customerPhone: string) {
+    try {
+      // Check if customer exists and has received welcome
+      const existingConversation = await prisma.conversation.findFirst({
+        where: {
+          customerPhoneHash: encryptionService.hashPhone(customerPhone)
+        }
+      });
+
+      // First-time customer - send welcome
+      if (!existingConversation) {
+        await this.sendWelcomeMessage(customerPhone);
+      }
+    } catch (error) {
+      console.error('Welcome check error:', error);
+    }
+  }
+
+  private async sendWelcomeMessage(customerPhone: string) {
+    const welcomeMessage = `
+  👋 Welcome to [Your Business Name]!
+
+  We're excited to serve you. Here's what you can do:
+
+  🛍️ Browse our catalog and place orders directly
+  💬 Chat with us for any questions
+  📦 Track your deliveries in real-time
+
+  How can we help you today?
+    `.trim();
+
+    await whatsappService.sendMessage(customerPhone, welcomeMessage);
+
+    // Optionally send catalog immediately
+    if (process.env.WHATSAPP_CATALOG_ID) {
+      await whatsappService.sendCatalogMessage(
+        customerPhone,
+        '📱 Check out our products:'
+      );
+    }
+
+    console.log('✅ Welcome message sent to:', customerPhone);
   }
 }

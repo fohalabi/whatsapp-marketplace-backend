@@ -18,10 +18,10 @@ interface DeliveryFeeConfig {
 // Island: VI, Lekki, Ikoyi, Ajah (generally east of Third Mainland Bridge)
 // Mainland: Ikeja, Yaba, Surulere, etc.
 const LAGOS_ISLAND_BOUNDS = {
-  minLat: 6.42,
-  maxLat: 6.50,
-  minLng: 3.40,
-  maxLng: 3.60
+  minLat: 6.42, // approximate southern boundary (near Ikoyi/VI)
+  maxLat: 6.50, // approximate northern boundary (near Lekki/Ajah)
+  minLng: 3.38, // approximate western boundary (near Third Mainland Bridge)
+  maxLng: 3.70 // approximate eastern boundary (near Ajah/Epe axis)
 };
 
 // Default delivery fees (in Naira)
