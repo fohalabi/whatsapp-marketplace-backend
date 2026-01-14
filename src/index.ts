@@ -34,6 +34,9 @@ import walletRoutes from './routes/wallet.routes';
 import fulfullmentRoutes from './routes/fulfillment.routes';
 import merchantStockRoutes from './routes/merchantStock.routes';
 import adminDashboardRoutes from './routes/adminDashboard.routes';
+import { startAutoReleaseJob } from './jobs/autoReleaseEscrow.job';
+import { start } from 'repl';
+import riderApprovalRoutes from './routes/riderAppoval.routes';
 
 dotenv.config();
 
@@ -94,6 +97,9 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/fulfillment', fulfullmentRoutes);
 app.use('/api/stock', merchantStockRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
+app.use('api', fulfullmentRoutes);
+app.use('/api', merchantStockRoutes);
+app.use('/api/riders/approval', riderApprovalRoutes);
 
 app.use('/api/test', testRoutes);
 
@@ -144,6 +150,7 @@ httpServer.listen(PORT, () => {
   console.log(`🌐 App URL: ${process.env.APP_URL || 'http://localhost:3001'}`);
   console.log(`📡 Socket.IO endpoint: ws://localhost:${PORT}`);
   startPaymentTimeoutJob();
+  startAutoReleaseJob();
 });
 
 // Handle server shutdown gracefully

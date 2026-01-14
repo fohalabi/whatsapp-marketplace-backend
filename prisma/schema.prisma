@@ -63,6 +63,7 @@ model Merchant {
 
   products             Product[]
   orders               Order[]
+  customerOrders      CustomerOrder[]
   wallet               MerchantWallet?
 
   @@map("merchants")
@@ -249,6 +250,7 @@ model CustomerOrder {
   customerEmail   String?             // Add email for Paystack
   merchantId      String
   totalAmount     Float
+  deliveryFee     Float               @default(0)
   status          CustomerOrderStatus @default(PENDING)
   paymentStatus   PaymentStatus       @default(PENDING)
   paymentReference String?            @unique // Paystack reference
@@ -262,6 +264,11 @@ model CustomerOrder {
 
   invoice         Invoice?
   paymentExpiresAt    DateTime?
+  
+  deliveryConfirmed       Boolean   @default(false)
+  deliveryConfirmedAt     DateTime?
+
+  merchant   Merchant @relation(fields: [merchantId], references: [id])
 
   refundStatus        RefundStatus   @default(NONE)
   refundReason        String?
@@ -721,6 +728,11 @@ model Rider {
   vehicleType       String
   vehicleNumber     String?
   licensePlate      String?
+
+  approvalStatus    String        @default("PENDING")
+  rejectionReason   String?
+  approvedBy        String?
+  approvedAt        DateTime?
   
   status            RiderStatus  @default(OFFLINE)
   currentLatitude   Float?
@@ -772,6 +784,11 @@ model Delivery {
   
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  customerConfirmed       Boolean   @default(false)
+  customerConfirmedAt     DateTime?
+  confirmationRequestedAt DateTime?
+  autoReleaseAt           DateTime?  
   
   @@map("deliveries")
 }
