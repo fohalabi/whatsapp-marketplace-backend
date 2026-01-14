@@ -33,7 +33,7 @@ export class OrderManagementController {
   // Merchant: Get merchant orders
   async getMerchantOrders(req: AuthRequest, res: Response) {
     try {
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.userId;
 
       if (!merchantId) {
         return res.status(403).json({
