@@ -293,7 +293,7 @@ Thank you for shopping with us! 🎉`,
     const newRider = await prisma.rider.findFirst({
       where: {
         status: 'AVAILABLE',
-        id: { not: delivery.riderId || undefined }
+        ...(delivery.riderId ? { id: { not: delivery.riderId } } : {})
       }
     });
 

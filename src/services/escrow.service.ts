@@ -16,9 +16,14 @@ export class EscrowService {
           include: {
             items: {
               include: {
-                product: true, // Need product to get wholesale price
+                product: true,
               },
             },
+            delivery: {
+              include: {
+                rider: true
+              }
+            }
           },
         },
       },
@@ -38,34 +43,73 @@ export class EscrowService {
       return sum + (markup * item.quantity);
     }, 0);
 
-    // Update escrow to RELEASED
-    await prisma.escrow.update({
-      where: { id: escrow.id },
-      data: {
-        status: 'RELEASED',
-        releasedAt: new Date(),
-      },
-    });
+    // Calculate delivery fee split
+    const deliveryFee = escrow.deliveryFeeAmount;
+    const riderAmount = deliveryFee * 0.8; // 80% to rider
+    const platformDeliveryFee = deliveryFee * 0.2; // 20% to platform
 
-    // Create payout entry with merchant earnings only
-    await prisma.payout.create({
-      data: {
-        orderId: escrow.orderId,
-        merchantId: escrow.merchantId,
-        amount: merchantEarnings,
-        status: 'PENDING',
-      },
-    });
+    // Execute transaction
+    await prisma.$transaction(async (tx) => {
+      // Update escrow to RELEASED
+      await tx.escrow.update({
+        where: { id: escrow.id },
+        data: {
+          status: 'RELEASED',
+          releasedAt: new Date(),
+        },
+      });
 
-    await this.walletService.updatePlatformWallet(platformCommission, 0);
+      // Create payout for merchant (products only)
+      await tx.payout.create({
+        data: {
+          orderId: escrow.orderId,
+          merchantId: escrow.merchantId,
+          amount: merchantEarnings,
+          status: 'PENDING',
+        },
+      });
+
+      // Add delivery fee to rider wallet
+      if (escrow.order.delivery?.riderId) {
+        await tx.rider.update({
+          where: { id: escrow.order.delivery.riderId },
+          data: {
+            walletBalance: { increment: riderAmount },
+            totalEarnings: { increment: riderAmount }
+          }
+        });
+
+        // Create delivery fee transaction record
+        await tx.deliveryFeeTransaction.create({
+          data: {
+            deliveryId: escrow.order.delivery.id,
+            riderId: escrow.order.delivery.riderId,
+            totalFee: deliveryFee,
+            riderAmount,
+            platformAmount: platformDeliveryFee,
+            status: 'COMPLETED',
+            completedAt: new Date()
+          }
+        });
+      }
+
+      // Update platform wallet
+      await this.walletService.updatePlatformWallet(
+        platformCommission + platformDeliveryFee, // Total platform earnings
+        0,
+        platformDeliveryFee
+      );
+    });
 
     console.log('Escrow released:', { 
       orderId, 
       merchantEarnings, 
-      platformCommission 
+      platformCommission,
+      riderAmount,
+      platformDeliveryFee
     });
 
-    return { merchantEarnings, platformCommission };
+    return { merchantEarnings, platformCommission, riderAmount, platformDeliveryFee };
   }
 
   async getEscrowByOrderId(orderId: string) {

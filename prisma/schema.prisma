@@ -398,6 +398,9 @@ model Escrow {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  productAmount    Float   @default(0)
+  deliveryFeeAmount Float  @default(0)
+
   @@map("escrow")
   @@index([merchantId, status])
 }
@@ -574,6 +577,7 @@ model PlatformWallet {
   totalRevenue        Float    @default(0)
   totalPayouts        Float    @default(0)
   currentBalance      Float    @default(0)
+  deliveryFeeEarnings Float    @default(0)
   updatedAt           DateTime @updatedAt
 
   @@map("platform_wallet")
@@ -737,6 +741,10 @@ model Rider {
   status            RiderStatus  @default(OFFLINE)
   currentLatitude   Float?
   currentLongitude  Float?
+
+  walletBalance    Float   @default(0)
+  totalEarnings    Float   @default(0)
+  feeTransactions DeliveryFeeTransaction[]
   
   rating            Float        @default(0)
   totalDeliveries   Int          @default(0)
@@ -789,6 +797,8 @@ model Delivery {
   customerConfirmedAt     DateTime?
   confirmationRequestedAt DateTime?
   autoReleaseAt           DateTime?  
+
+  feeTransactions DeliveryFeeTransaction[]
   
   @@map("deliveries")
 }
@@ -804,6 +814,22 @@ model DeliveryEvent {
   createdAt   DateTime        @default(now())
   
   @@map("delivery_events")
+}
+
+model DeliveryFeeTransaction {
+  id              String   @id @default(cuid())
+  deliveryId      String
+  delivery        Delivery @relation(fields: [deliveryId], references: [id])
+  riderId         String
+  rider           Rider    @relation(fields: [riderId], references: [id])
+  totalFee        Float
+  riderAmount     Float
+  platformAmount  Float
+  status          String   @default("PENDING") // PENDING, COMPLETED
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@map("delivery_fee_transactions")
 }
 
 model ErrorLog {

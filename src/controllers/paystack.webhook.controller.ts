@@ -172,6 +172,8 @@ export class PaystackWebhookController {
           orderId: order.id,
           merchantId: order.merchantId,
           amount: order.totalAmount,
+          productAmount: order.totalAmount - order.deliveryFee,
+          deliveryFeeAmount: order.deliveryFee,
           status: 'HELD',
         },
       });

@@ -189,7 +189,7 @@ export class WalletService {
   }
 
   // Update platform wallet
-  async updatePlatformWallet(revenue: number, payout: number) {
+  async updatePlatformWallet(revenue: number, payout: number, deliveryFeeRevenue: number = 0) {
     let platformWallet = await prisma.platformWallet.findFirst();
 
     if (!platformWallet) {
@@ -198,6 +198,7 @@ export class WalletService {
           totalRevenue: revenue,
           totalPayouts: payout,
           currentBalance: revenue - payout,
+          deliveryFeeEarnings: deliveryFeeRevenue,
         },
       });
     } else {
@@ -207,11 +208,12 @@ export class WalletService {
           totalRevenue: { increment: revenue },
           totalPayouts: { increment: payout },
           currentBalance: { increment: revenue - payout },
+          deliveryFeeEarnings: { increment: deliveryFeeRevenue },
         },
       });
     }
 
-    console.log('Platform wallet updated:', { revenue, payout });
+    console.log('Platform wallet updated:', { revenue, payout, deliveryFeeRevenue });
   }
 
   // Get platform wallet
