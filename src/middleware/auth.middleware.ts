@@ -39,7 +39,15 @@ export const authorize = (...allowedRoles: Role[]) => {
         message: 'Unauthorized',
       });
     }
-    if (!allowedRoles.includes(req.user.role)) {
+
+    console.log('User role:', req.user.role, typeof req.user.role);
+    console.log('Allowed roles:', allowedRoles);
+    
+    // Convert string role to match enum
+    const userRole = req.user.role as string;
+    const allowedRoleStrings = allowedRoles.map(r => r.toString());
+    
+    if (!allowedRoleStrings.includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: Insufficient permissions',

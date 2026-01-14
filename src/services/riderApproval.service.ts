@@ -8,7 +8,6 @@ export class RiderApprovalService {
         user: {
           select: {
             email: true,
-            phone: true,
           },
         },
       },
@@ -17,20 +16,24 @@ export class RiderApprovalService {
   }
 
   async getAllRiders(status?: string) {
-    const where = status ? { approvalStatus: status } : {};
+    try {
+      const where = status ? { approvalStatus: status } : {};
 
-    return await prisma.rider.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            email: true,
-            phone: true,
+      return await prisma.rider.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              email: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      console.error('❌ getAllRiders error:', error);
+      throw error;
+    }
   }
 
   async approveRider(riderId: string, adminId: string) {
