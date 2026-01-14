@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { WhatsAppService } from '../whatsapp.service';
 import { getIO } from '../../config/socket';
 import { DeliveryStatus } from '@prisma/client';
+import { calculateDistance, calculateETA, formatETA } from '../../utils/eta.utils';
 
 const whatsappService = new WhatsAppService();
 
@@ -54,7 +55,7 @@ export class DeliveryOrchestrator {
     };
 
     // Find available rider
-    const rider = await this.findAvailableRider();
+    const rider = await this.findAvailableRider(merchant.latitude!, merchant.longitude!);
 
     // Create delivery
     const delivery = await prisma.delivery.create({
@@ -213,30 +214,69 @@ We'll notify you when the rider is nearby.`
     });
   }
 
-  private async findAvailableRider() {
-    return await prisma.rider.findFirst({
+  private async findAvailableRider(pickupLatitude: number, pickupLongitude: number) {
+    // Get all available riders
+    const availableRiders = await prisma.rider.findMany({
       where: { status: 'AVAILABLE' },
     });
+
+    if (availableRiders.length === 0) return null;
+
+    // Filter riders with location data
+    const ridersWithLocation = availableRiders.filter(
+      r => r.currentLatitude && r.currentLongitude
+    );
+
+    // If no riders have location, return first available
+    if (ridersWithLocation.length === 0) {
+      return availableRiders[0];
+    }
+
+    // Calculate distance for each rider and find nearest
+    const ridersWithDistance = ridersWithLocation.map(rider => ({
+      rider,
+      distance: calculateDistance(
+        { latitude: pickupLatitude, longitude: pickupLongitude },
+        { latitude: rider.currentLatitude!, longitude: rider.currentLongitude! }
+      )
+    }));
+
+    // Sort by distance (nearest first)
+    ridersWithDistance.sort((a, b) => a.distance - b.distance);
+
+    // return nearest rider or null
+    return ridersWithDistance[0]?.rider || null;
   }
 
   private async notifyCustomer(delivery: any, status: DeliveryStatus) {
     const messages: Record<string, string> = {
       [DeliveryStatus.ASSIGNED]: `✅ Rider assigned!
 
-Delivery: ${delivery.deliveryNumber}
-Rider: ${delivery.rider?.firstName || 'On the way'}`,
+      Delivery: ${delivery.deliveryNumber}
+      Rider: ${delivery.rider?.firstName || 'On the way'}`,
 
-      [DeliveryStatus.PICKED_UP]: `📦 Order picked up!
+      [DeliveryStatus.PICKED_UP]: (() => {
+        const distance = calculateDistance(
+          { latitude: delivery.pickupLatitude, longitude: delivery.pickupLongitude },
+          { latitude: delivery.deliveryLatitude, longitude: delivery.deliveryLongitude }
+        );
+        const etaMinutes = calculateETA(distance);
+        const etaText = formatETA(etaMinutes);
 
-Your order is on its way.`,
+        return `📦 Order picked up!
+
+      Your order is on the way!
+      Distance: ${distance} km
+      Expected delivery: ${etaText}`;
+      })(),
 
       [DeliveryStatus.IN_TRANSIT]: `🚚 Order in transit
 
-Your rider is heading to your location.`,
+      Your rider is heading to your location.`,
 
       [DeliveryStatus.DELIVERED]: `✅ Delivered!
 
-Thank you for shopping with us! 🎉`,
+      Thank you for shopping with us! 🎉`,
     };
 
     const message = messages[status];
@@ -290,12 +330,23 @@ Thank you for shopping with us! 🎉`,
     const previousRider = delivery.rider;
 
     // Find new available rider (exclude previous rider)
-    const newRider = await prisma.rider.findFirst({
-      where: {
-        status: 'AVAILABLE',
-        ...(delivery.riderId ? { id: { not: delivery.riderId } } : {})
-      }
-    });
+    const newRider = await this.findAvailableRider(
+      delivery.pickupLatitude,
+      delivery.pickupLongitude,
+    );
+
+    // Exclude previous rider if found
+    if (newRider && newRider.id === delivery.riderId) {
+      // Same rider, find another
+      const allRiders = await prisma.rider.findMany({
+        where: { 
+          status: 'AVAILABLE',
+          id: { not: delivery.riderId }
+        }
+      });
+      
+      return allRiders.length > 0 ? allRiders[0] : null;
+    }
 
     if (!newRider) {
       console.warn('⚠️ No available rider for reassignment:', deliveryId);
