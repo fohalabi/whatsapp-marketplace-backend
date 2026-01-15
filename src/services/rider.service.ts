@@ -100,13 +100,47 @@ export class RiderService {
         status,
         ...(status === 'PICKED_UP' && { pickedUpAt: new Date() }),
         ...(status === 'DELIVERED' && {
-            deliveredAt: new Date(),
-            ...(proofImage && { proofOfDeliveryImage: proofImage }),
-            ...(notes && { deliveryNotes: notes }),
+          deliveredAt: new Date(),
+          ...(proofImage && { proofOfDeliveryImage: proofImage }),
+          ...(notes && { deliveryNotes: notes }),
         }),
       },
     });
 
+    // Handle PICKED_UP status - add money to pending balance
+    if (status === 'PICKED_UP') {
+      const deliveryWithOrder = await prisma.delivery.findUnique({
+        where: { id: deliveryId },
+        include: { order: true }
+      });
+
+      if (!deliveryWithOrder) throw new Error('Delivery not found');
+
+      const deliveryFee = deliveryWithOrder.order.deliveryFee || 0;
+      const riderAmount = Math.round(deliveryFee * 0.8);
+
+      await prisma.rider.update({
+        where: { id: rider.id },
+        data: {
+          status: 'BUSY',
+          pendingBalance: { increment: riderAmount }
+        },
+      });
+
+      // Create transaction record (pending status)
+      await prisma.deliveryFeeTransaction.create({
+        data: {
+          deliveryId,
+          riderId: rider.id,
+          totalFee: deliveryFee,
+          riderAmount,
+          platformAmount: deliveryFee - riderAmount,
+          status: 'PENDING',
+        },
+      });
+    }
+
+    // Handle DELIVERED status
     if (status === 'DELIVERED') {
       // Fetch delivery with order
       const deliveryWithOrder = await prisma.delivery.findUnique({
@@ -116,6 +150,7 @@ export class RiderService {
 
       if (!deliveryWithOrder) throw new Error('Delivery not found');
 
+      // Set auto-release timer
       await prisma.delivery.update({
         where: { id: deliveryId },
         data: {
@@ -124,16 +159,25 @@ export class RiderService {
         }
       });
 
+      // Free up rider (set to AVAILABLE, increment totalDeliveries)
+      await prisma.rider.update({
+        where: { id: rider.id },
+        data: {
+          status: 'AVAILABLE',
+          totalDeliveries: { increment: 1 },
+        },
+      });
+
       // Send confirmation request to customer
       const whatsappService = new WhatsAppService();
       await whatsappService.sendInteractiveButtons(
         deliveryWithOrder.order.customerPhone,
         `✅ Your order has been delivered!
 
-    Order: ${deliveryWithOrder.order.orderNumber}
-    Delivery: ${deliveryWithOrder.deliveryNumber}
+  Order: ${deliveryWithOrder.order.orderNumber}
+  Delivery: ${deliveryWithOrder.deliveryNumber}
 
-    Please confirm you received your order in good condition.`,
+  Please confirm you received your order in good condition.`,
         [
           { id: 'confirm_delivery', title: '✅ Confirm Delivery' },
           { id: 'report_issue', title: '⚠️ Report Issue' }
@@ -149,17 +193,6 @@ export class RiderService {
         ...(notes && { description: notes }),
       },
     });
-
-    // If delivered, free up rider
-    if (status === 'DELIVERED') {
-      await prisma.rider.update({
-        where: { id: rider.id },
-        data: {
-          status: 'AVAILABLE',
-          totalDeliveries: { increment: 1 },
-        },
-      });
-    }
 
     return updated;
   }

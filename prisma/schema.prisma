@@ -40,6 +40,7 @@ model User {
   segments Segment[]  
 
   rider       Rider?
+  platformWalletTransactions PlatformWalletTransaction[]
 
   @@map("users")
 }
@@ -583,6 +584,48 @@ model PlatformWallet {
   @@map("platform_wallet")
 }
 
+model RiderWalletTransaction {
+  id                String   @id @default(cuid())
+  riderId           String
+  rider             Rider    @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  type              String  
+  amount            Float
+  balanceAfter      Float
+  reference         String   @unique
+  paystackReference String?
+  bankDetails       Json?   
+  status            String   @default("PENDING") 
+  description       String?
+  createdAt         DateTime @default(now())
+  completedAt       DateTime?
+
+  @@index([riderId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("rider_wallet_transactions")
+}
+
+model PlatformWalletTransaction {
+  id                String   @id @default(cuid())
+  adminId           String
+  admin             User     @relation(fields: [adminId], references: [id])
+  type              String   
+  amount            Float
+  balanceAfter      Float
+  reference         String   @unique
+  paystackReference String?
+  bankDetails       Json?   
+  status            String   @default("PENDING") 
+  description       String?
+  createdAt         DateTime @default(now())
+  completedAt       DateTime?
+
+  @@index([adminId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("platform_wallet_transactions")
+}
+
 model Broadcast {
   id String @id @default(cuid())
   name String
@@ -743,6 +786,7 @@ model Rider {
   currentLongitude  Float?
 
   walletBalance    Float   @default(0)
+  pendingBalance   Float   @default(0)
   totalEarnings    Float   @default(0)
   feeTransactions DeliveryFeeTransaction[]
   
@@ -753,6 +797,8 @@ model Rider {
   
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+
+  walletTransactions RiderWalletTransaction[]
   
   @@map("riders")
 }

@@ -69,11 +69,12 @@ export class EscrowService {
         },
       });
 
-      // Add delivery fee to rider wallet
+      // Move from pending to available wallet
       if (escrow.order.delivery?.riderId) {
         await tx.rider.update({
           where: { id: escrow.order.delivery.riderId },
           data: {
+            pendingBalance: {decrement: riderAmount },
             walletBalance: { increment: riderAmount },
             totalEarnings: { increment: riderAmount }
           }
