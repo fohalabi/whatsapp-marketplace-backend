@@ -275,8 +275,10 @@ export class WalletService {
       throw new Error('Insufficient platform balance');
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.platformWallet.update({
+    const reference = `PLATFORM_WD_${Date.now()}`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedWallet = await tx.platformWallet.update({
         where: { id: platformWallet.id },
         data: {
           currentBalance: { decrement: amount },
@@ -284,19 +286,34 @@ export class WalletService {
         },
       });
 
+      const transaction = await tx.platformWalletTransaction.create({
+        data: {
+          adminId,
+          type: 'WITHDRAWAL',
+          amount,
+          balanceAfter: updatedWallet.currentBalance,
+          reference,
+          bankDetails,
+          status: 'PENDING',
+          description: `Platform withdrawal to ${bankDetails.bankName} - ${bankDetails.accountNumber}`
+        }
+      });
+
       // Log activity
       await tx.activityLog.create({
         data: {
           userId: adminId,
           action: 'platform_withdrawal',
-          description: `Platform withdrawal of ${amount} to ${bankDetails.bankName}`,
+          description: `Platform withdrawal of ₦${amount.toLocaleString()} to ${bankDetails.bankName}`,
           metadata: {
             amount,
             bankDetails,
-            reference: `PLATFORM_WD_${Date.now()}`
+            reference
           }
         }
       });
+
+      return { updatedWallet, transaction };
     });
 
     // Get bank code and initiate Paystack transfer
@@ -319,9 +336,7 @@ export class WalletService {
         bankDetails.accountName
       );
 
-      const reference = `PLATFORM_WD_${Date.now()}`;
-
-      await this.paystackService.initiateTransfer(
+      const paystackResponse = await this.paystackService.initiateTransfer(
         amount,
         recipient.recipient_code,
         bankCode,
@@ -330,24 +345,43 @@ export class WalletService {
         'Platform withdrawal'
       );
 
+      // Update transaction with Paystack reference and mark as completed
+      await prisma.platformWalletTransaction.update({
+        where: { id: result.transaction.id },
+        data: {
+          status: 'COMPLETED',
+          paystackReference: paystackResponse.transfer_code || reference,
+          completedAt: new Date()
+        }
+      });
+
       console.log('Platform transfer initiated:', reference);
+
+      return { success: true, amount, reference, transaction: result.transaction };
     } catch (error: any) {
       console.error('Platform transfer failed:', error.message);
       
       // Rollback platform wallet debit
-      await prisma.platformWallet.update({
-        where: { id: platformWallet.id },
-        data: {
-          currentBalance: { increment: amount },
-          totalPayouts: { decrement: amount },
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.platformWallet.update({
+          where: { id: platformWallet.id },
+          data: {
+            currentBalance: { increment: amount },
+            totalPayouts: { decrement: amount },
+          },
+        });
+
+        await tx.platformWalletTransaction.update({
+          where: { id: result.transaction.id },
+          data: {
+            status: 'FAILED',
+            description: `Withdrawal failed: ${error.message}`
+          }
+        });
       });
 
       throw new Error(`Bank transfer failed: ${error.message}`);
     }
-
-    console.log('Platform wallet debited:', { adminId, amount });
-    return { success: true, amount };
   }
 
   // Get all merchant wallets for admin

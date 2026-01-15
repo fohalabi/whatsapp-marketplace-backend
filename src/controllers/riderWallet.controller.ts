@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../types/auth.types';
 import { RiderWalletService } from '../services/riderWallet.service';
+import prisma from '../config/database';
 
 const riderWalletService = new RiderWalletService();
 
@@ -60,6 +61,42 @@ export class RiderWalletController {
       });
     } catch (error: any) {
       res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  async getWithdrawalHistory(req: AuthRequest, res: Response) {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      const rider = await prisma.rider.findUnique({
+        where: { userId: req.user!.userId },
+      });
+
+      if (!rider) {
+        return res.status(404).json({
+          success: false,
+          message: 'Rider not found',
+        });
+      }
+
+      const withdrawals = await prisma.riderWalletTransaction.findMany({
+        where: { 
+          riderId: rider.id,
+          type: 'WITHDRAWAL'
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+
+      res.json({
+        success: true,
+        data: withdrawals,
+      });
+    } catch (error: any) {
+      res.status(500).json({
         success: false,
         message: error.message,
       });

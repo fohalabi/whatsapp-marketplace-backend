@@ -1,27 +1,67 @@
 import { Router } from 'express';
+import { authenticate, authorize } from '../middleware/auth.middleware';
 import { WalletController } from '../controllers/wallet.controller';
-import { authenticate } from '../middleware/auth.middleware';
+import { Role } from '@prisma/client';
 
 const router = Router();
 const walletController = new WalletController();
 
+// Platform wallet routes (Admin only)
+router.get(
+  '/platform',
+  authenticate,
+  authorize(Role.ADMIN),
+  walletController.getPlatformWallet
+);
+
+router.get(
+  '/platform/transactions',
+  authenticate,
+  authorize(Role.ADMIN),
+  walletController.getPlatformTransactions
+);
+
+router.post(
+  '/platform/withdraw',
+  authenticate,
+  authorize(Role.ADMIN),
+  walletController.withdrawFromPlatform
+);
+
+router.get(
+  '/platform/revenue',
+  authenticate,
+  authorize(Role.ADMIN),
+  walletController.getPlatformRevenue
+);
+
 // Merchant wallet routes
-router.get('/merchant/:merchantId', authenticate, (req, res) => walletController.getMerchantWallet(req, res));
-router.get('/merchant/:merchantId/transactions', authenticate, (req, res) => walletController.getMerchantTransactions(req, res));
-router.post('/merchant/:merchantId/withdraw', authenticate, (req, res) => walletController.requestWithdrawal(req, res));
+router.get(
+  '/merchant/:merchantId',
+  authenticate,
+  authorize(Role.ADMIN, Role.MERCHANT), // Both admin and merchant can view
+  walletController.getMerchantWallet
+);
 
-// Platform wallet routes
-router.get('/platform', authenticate, (req, res) => walletController.getPlatformWallet(req, res));
+router.get(
+  '/merchant/:merchantId/transactions',
+  authenticate,
+  authorize(Role.ADMIN, Role.MERCHANT),
+  walletController.getMerchantTransactions
+);
 
-// Merchant dashboard data
-router.get('/merchant/:merchantId/dashboard', authenticate, (req, res) => walletController.getMerchantDashboardData(req, res));
+router.get(
+  '/merchant/:merchantId/dashboard',
+  authenticate,
+  authorize(Role.ADMIN, Role.MERCHANT),
+  walletController.getMerchantDashboardData
+);
 
-// Platform revenue
-router.get('/platform/revenue', authenticate, (req, res) => walletController.getPlatformRevenue(req, res));
+router.post(
+  '/merchant/:merchantId/withdraw',
+  authenticate,
+  authorize(Role.MERCHANT), // Only merchant can withdraw their own funds
+  walletController.requestWithdrawal
+);
 
-// Platform withdrawal
-router.post('/platform/withdraw', authenticate, (req, res) => walletController.withdrawFromPlatform(req, res));
-
-// Get all merchant wallets
-router.get('/merchants/all', authenticate, (req, res) => walletController.getAllMerchnatWallets(req, res));
 export default router;
