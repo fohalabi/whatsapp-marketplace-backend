@@ -91,6 +91,7 @@ export class MerchantService {
         category: data.category,
         location: data.location,
         phone: data.phone,
+        verificationStatus: VerificationStatus.NOT_SUBMITTED,
       },
       include: {
         user: {

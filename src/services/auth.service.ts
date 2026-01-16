@@ -27,6 +27,7 @@ export class AuthService {
                             category: 'General',
                             location: 'Nigeria',
                             phone: data.email,
+                            verificationStatus: 'NOT_SUBMITTED',
                         }
                     }
                 })

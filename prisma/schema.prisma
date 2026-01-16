@@ -900,6 +900,7 @@ enum Role {
 }
 
 enum VerificationStatus {
+  NOT_SUBMITTED
   PENDING
   VERIFIED
   REJECTED
@@ -968,9 +969,9 @@ enum PayoutStatus {
 }
 
 enum TransactionType {
-  CREDIT      // Money added to wallet
-  DEBIT       // Money withdrawn from wallet
-  WITHDRAWAL  // Merchant withdrawal
+  CREDIT      
+  DEBIT       
+  WITHDRAWAL  
 }
 
 enum BroadcastStatus {

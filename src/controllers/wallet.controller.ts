@@ -21,7 +21,7 @@ export class WalletController {
       // verify merchant owns this wallet
       if (req.user?.role === 'MERCHANT') {
         const merchant = await prisma.merchant.findUnique({
-          where: { userId: req.user.id }
+          where: { userId: req.user.userId }
         });
 
         if (merchant?.id !== merchantId) {
@@ -61,7 +61,7 @@ export class WalletController {
       // Verify merchant owns this wallet (unless admin)
       if (req.user?.role === 'MERCHANT') {
         const merchant = await prisma.merchant.findUnique({
-          where: { userId: req.user.id }
+          where: { userId: req.user.userId }
         });
 
         if (merchant?.id !== merchantId ) {
@@ -100,7 +100,7 @@ export class WalletController {
 
       // Verify merchant owns this wallet
       const merchant = await prisma.merchant.findUnique({
-        where: { userId: req.user!.id }
+        where: { userId: req.user!.userId }
       });
 
       if (merchant?.id !== merchantId) {
@@ -174,9 +174,8 @@ export class WalletController {
       // Verify merchant owns this wallet (unless admin)
       if (req.user?.role === 'MERCHANT') {
         const merchant = await prisma.merchant.findUnique({
-          where: { userId: req.user.id }
+          where: { userId: req.user.userId }
         });
-
         if (merchant?.id !== merchantId) {
           return res.status(403).json({
             success: false,
@@ -190,6 +189,8 @@ export class WalletController {
         walletService.getMerchantPendingBalance(merchantId),
         walletService.getMerchantTransactions(merchantId, 10)
       ]);
+
+   
 
       res.json({
         success: true,
