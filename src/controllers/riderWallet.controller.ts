@@ -102,4 +102,19 @@ export class RiderWalletController {
       });
     }
   }
+
+  async getAllRiderWallets(req: AuthRequest, res: Response) {
+    try {
+      const wallets = await riderWalletService.getAllRiderWallets();
+      res.json({
+        success: true,
+        data: wallets,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 }

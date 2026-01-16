@@ -37,6 +37,13 @@ router.get(
 
 // Merchant wallet routes
 router.get(
+  '/merchants/all',
+  authenticate,
+  authorize(Role.ADMIN),
+  walletController.getAllMerchnatWallets
+);
+
+router.get(
   '/merchant/:merchantId',
   authenticate,
   authorize(Role.ADMIN, Role.MERCHANT), // Both admin and merchant can view

@@ -92,6 +92,7 @@ app.use('/api/escrow', escrowRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/riders/approval', riderApprovalRoutes);
+app.use('/api/rider/wallet', riderWalletRoutes);
 app.use('/api/rider', riderRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/order-management', orderManagementRoutes);
@@ -101,7 +102,7 @@ app.use('/api/stock', merchantStockRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/fulfillment', fulfullmentRoutes);
 app.use('/api', merchantStockRoutes);
-app.use('/api/rider/wallet', riderWalletRoutes);
+
 
 
 app.use('/api/test', testRoutes);

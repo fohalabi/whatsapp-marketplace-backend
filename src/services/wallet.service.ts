@@ -393,7 +393,6 @@ export class WalletService {
             user: {
               select: {
                 email: true,
-                phone: true
               }
             }
           }

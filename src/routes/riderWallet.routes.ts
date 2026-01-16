@@ -37,4 +37,11 @@ router.post(
   riderWalletController.requestWithdrawal
 );
 
+router.get(
+  '/all',
+  authenticate,
+  authorize(Role.ADMIN),
+  (req, res) => riderWalletController.getAllRiderWallets(req, res)
+);
+
 export default router;

@@ -277,13 +277,17 @@ export class WalletController {
 
   async getAllMerchnatWallets(req: AuthRequest, res: Response) {
     try {
+      console.log('Fetching all merchant wallets..');
       const wallets = await walletService.getAllMerchantWallets();
+      console.log('wallet fetched:', wallets.length);
 
       res.json({
         success: true,
         data: wallets,
       })
     } catch (error: any) {
+      console.error('Error in getAllMerchantWallets:', error.message);
+      console.error('Stack trace:', error);
       res.status(500).json({
         success: false,
         message: error.message,

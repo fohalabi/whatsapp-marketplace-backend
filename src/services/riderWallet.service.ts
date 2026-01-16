@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { upload } from '../utils/upload.utils';
 import { PaystackService } from './paystack.service';
 
 export class RiderWalletService {
@@ -164,5 +165,33 @@ export class RiderWalletService {
 
       throw new Error(`Withdrawal failed: ${error.message}`);
     }
+  }
+
+  async getAllRiderWallets() {
+    const riders = await prisma.rider.findMany({
+      include: {
+        user: {
+          select: {
+            email: true,
+          }
+        }
+      },
+      orderBy: { walletBalance: 'desc' }
+    });
+
+    return riders.map(r => ({
+      id: r.id,
+      riderId: r.id,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      phone: r.phone,
+      email: r.user.email,
+      walletBalance: r.walletBalance,
+      totalEarnings: r.totalEarnings,
+      totalDeliveries: r.totalDeliveries,
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt
+    }));
   }
 }
