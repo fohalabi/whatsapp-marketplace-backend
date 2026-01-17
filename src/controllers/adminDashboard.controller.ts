@@ -1,5 +1,5 @@
-// controllers/admin-dashboard.controller.ts
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../types/auth.types';
 import { AdminDashboardService } from '../services/adminDashboard.service';
 
 export class AdminDashboardController {
@@ -9,10 +9,10 @@ export class AdminDashboardController {
     this.dashboardService = new AdminDashboardService();
   }
 
-  async getDashboard(req: Request, res: Response) {
+  async getDashboard(req: AuthRequest, res: Response) {
     try {
       // Verify admin access
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({
           success: false,
           message: 'Access denied. Admin privileges required.'
@@ -60,7 +60,7 @@ export class AdminDashboardController {
         meta: {
           timeFrame,
           generatedAt: new Date().toISOString(),
-          userId: req.user?.id
+          userId: req.user!.userId
         }
       });
     } catch (error: any) {
@@ -73,9 +73,9 @@ export class AdminDashboardController {
     }
   }
 
-  async getStats(req: Request, res: Response) {
+  async getStats(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
@@ -89,9 +89,9 @@ export class AdminDashboardController {
     }
   }
 
-  async getRevenueTrend(req: Request, res: Response) {
+  async getRevenueTrend(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
@@ -105,9 +105,9 @@ export class AdminDashboardController {
     }
   }
 
-  async getTopMerchants(req: Request, res: Response) {
+  async getTopMerchants(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
@@ -121,9 +121,9 @@ export class AdminDashboardController {
     }
   }
 
-  async getDeliveryZones(req: Request, res: Response) {
+  async getDeliveryZones(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
@@ -135,9 +135,9 @@ export class AdminDashboardController {
     }
   }
 
-  async getOrderFlow(req: Request, res: Response) {
+  async getOrderFlow(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
@@ -149,9 +149,9 @@ export class AdminDashboardController {
     }
   }
 
-  async getAlerts(req: Request, res: Response) {
+  async getAlerts(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
@@ -163,9 +163,9 @@ export class AdminDashboardController {
     }
   }
 
-  async getSystemHealth(req: Request, res: Response) {
+  async getSystemHealth(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
@@ -177,13 +177,38 @@ export class AdminDashboardController {
     }
   }
 
-  async exportReport(req: Request, res: Response) {
+  async exportReport(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 
       const { startDate, endDate, reportType } = req.body;
+      
+      // Validate input
+      if (!startDate || !endDate || !reportType) {
+        return res.status(400).json({
+          success: false,
+          message: 'startDate, endDate, and reportType are required'
+        });
+      }
+
+      // Validate date format
+      if (isNaN(Date.parse(startDate)) || isNaN(Date.parse(endDate))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date format. Use ISO 8601 format (YYYY-MM-DD)'
+        });
+      }
+
+      // Validate reportType
+      const validReportTypes = ['sales', 'merchants', 'delivery', 'orders'];
+      if (!validReportTypes.includes(reportType)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid reportType. Must be one of: ${validReportTypes.join(', ')}`
+        });
+      }
       
       // Generate report data
       const reportData = await this.generateReport(startDate, endDate, reportType);
@@ -201,9 +226,9 @@ export class AdminDashboardController {
     }
   }
 
-  async healthCheck(req: Request, res: Response) {
+  async healthCheck(req: AuthRequest, res: Response) {
     try {
-      if (req.user?.role !== 'ADMIN') {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return res.status(403).json({ success: false, message: 'Access denied' });
       }
 

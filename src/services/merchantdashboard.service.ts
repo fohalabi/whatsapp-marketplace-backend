@@ -1,85 +1,129 @@
 import prisma from '../config/database';
 
 export class DashboardService {
-  async getMerchantStats(merchantId: string) {
-    const [ordersToPrepare, recentOrders, lowStockItems, productsCount] = await Promise.all([
-      // Count orders with PENDING or ACCEPTED status
-      prisma.order.count({
+  async getMerchantDashboard(merchantId: string, timeFrame: 'today' | '7days' | '30days' = 'today') {
+    try {
+      const dateRange = this.getDateRange(timeFrame);
+
+      // Fetch all data in parallel
+      const [
+        stats,
+        salesTrend,
+        categoryPerformance,
+        topProducts,
+        recentOrders,
+        lowStockProducts,
+        deliveryZones,
+        walletBalance,
+        customerMetrics
+      ] = await Promise.all([
+        this.getStats(merchantId, dateRange),
+        this.getSalesTrend(merchantId, dateRange),
+        this.getCategoryPerformance(merchantId),
+        this.getTopProducts(merchantId, dateRange),
+        this.getRecentOrders(merchantId),
+        this.getLowStockProducts(merchantId),
+        this.getDeliveryZonePerformance(merchantId, dateRange),
+        this.getWalletBalance(merchantId),
+        this.getCustomerMetrics(merchantId, dateRange)
+      ]);
+
+      return {
+        stats: {
+          ...stats,
+          walletBalance,
+          recentOrders
+        },
+        salesTrend,
+        categoryPerformance,
+        topProducts,
+        lowStockProducts,
+        deliveryZones,
+        customerMetrics,
+        timeFrame,
+        generatedAt: new Date().toISOString()
+      };
+    } catch (error: any) {
+      console.error('Error fetching merchant dashboard:', error);
+      throw new Error('Failed to fetch dashboard data');
+    }
+  }
+
+  private async getStats(merchantId: string, dateRange: { start: Date; end: Date }) {
+    const [ordersToPrepare, totalProducts, lowStockCount, totalOrders, totalRevenue] = await Promise.all([
+      // Orders pending or processing
+      prisma.customerOrder.count({
         where: {
           merchantId,
-          status: { in: ['PENDING', 'ACCEPTED'] }
+          status: { in: ['PENDING', 'PROCESSING'] }
         }
       }),
 
-      // Get 5 most recent orders with product names
-      prisma.order.findMany({
-        where: { merchantId },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          orderItems: {
-            include: {
-              product: { select: { name: true } }
-            }
+      // Total products
+      prisma.product.count({
+        where: { merchantId }
+      }),
+
+      // Low stock count
+      prisma.product.count({
+        where: {
+          merchantId,
+          stockQuantity: { lt: 10 }
+        }
+      }),
+
+      // Total orders in time frame
+      prisma.customerOrder.count({
+        where: {
+          merchantId,
+          createdAt: {
+            gte: dateRange.start,
+            lte: dateRange.end
           }
         }
       }),
 
-      // Identify low stock items (Quantity < 10)
-      prisma.product.findMany({
+      // Total revenue in time frame
+      prisma.customerOrder.aggregate({
         where: {
           merchantId,
-          stockQuantity: { lt: 10 }
+          paymentStatus: 'PAID',
+          createdAt: {
+            gte: dateRange.start,
+            lte: dateRange.end
+          }
         },
-        select: {
-          name: true,
-          stockQuantity: true,
-          unit: true
-        }
-      }),
-
-      // Count all products listed by merchant
-      prisma.product.count({
-        where: { merchantId }
+        _sum: { totalAmount: true }
       })
     ]);
 
+    const totalRevenuAmount = totalRevenue._sum.totalAmount || 0;
+    const averageOrderValue = totalOrders > 0 ? totalRevenuAmount / totalOrders : 0;
+
     return {
+      totalProducts,
       ordersToPrepare,
-      productsListed: productsCount,
-      lowStockCount: lowStockItems.length,
-      recentOrders,
-      lowStockItems
+      lowStockCount,
+      totalOrders,
+      totalRevenue: totalRevenuAmount,
+      averageOrderValue
     };
   }
 
-  async getSalesTrend(merchantId: string, timeFrame: 'today' | '7days' | '30days' = '7days') {
-    // Calculate date range
-    const now = new Date();
-    let startDate: Date;
-
-    if (timeFrame === 'today') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (timeFrame === '7days') {
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    } else { // 30days
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    }
-
-    // Get orders within the date range
-    const orders = await prisma.order.findMany({
+  private async getSalesTrend(merchantId: string, dateRange: { start: Date; end: Date }) {
+    const orders = await prisma.customerOrder.findMany({
       where: {
         merchantId,
+        paymentStatus: 'PAID',
         createdAt: {
-          gte: startDate,
-          lte: now
+          gte: dateRange.start,
+          lte: dateRange.end
         }
       },
       select: {
-        id: true,
         totalAmount: true,
         createdAt: true,
-        orderItems: {
+        items: {
           select: {
             quantity: true
           }
@@ -87,77 +131,73 @@ export class DashboardService {
       }
     });
 
-    // Group by day and calculate totals
-    const salesByDay = new Map<string, { orders: number, revenue: number }>();
+    const groupedByDay = this.groupOrdersByDay(orders);
 
-    orders.forEach(order => {
-      const day = order.createdAt.toISOString().split('T')[0] || '';
-      const existing = salesByDay.get(day) || { orders: 0, revenue: 0 };
-
-      const itemsCount = order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
-
-      salesByDay.set(day, {
-        orders: existing.orders + itemsCount,
-        revenue: existing.revenue + order.totalAmount
-      });
-    });
-
-    // Format for chart
-    const result = Array.from(salesByDay.entries()).map(([day, data]) => ({
-      day: new Date(day).toLocaleDateString('en-US', { weekday: 'short' }),
-      orders: data.orders,
-      revenue: data.revenue
-    })).sort((a, b) => new Date(a.day).getTime() - new Date(b.day).getTime());
-
-    return result;
+    return Array.from(groupedByDay.entries()).map(([day, data]) => ({
+      day,
+      orders: data.ordersCount,
+      revenue: data.totalRevenue,
+      profit: data.totalRevenue * 0.15 // Assuming 15% profit margin
+    }));
   }
 
-  async getCategoryPerformance(merchantId: string) {
-    // Get products grouped by category with sales data
+  private async getCategoryPerformance(merchantId: string) {
     const products = await prisma.product.findMany({
       where: { merchantId },
       select: {
         category: true,
-        orderItems: {
+        price: true,
+        customerOrderItems: {
           select: {
-            quantity: true,
-            price: true
+            quantity: true
           }
         }
       }
     });
 
-    // Calculate sales by category
-    const categorySales = new Map<string, number>();
+    const categoryMap = new Map<string, { revenue: number; orders: number }>();
 
     products.forEach(product => {
       const category = product.category || 'Uncategorized';
-      const totalSales = product.orderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      const itemsRevenue = product.customerOrderItems.reduce((sum, item) => sum + (item.quantity * product.price), 0);
+      const itemsCount = product.customerOrderItems.reduce((sum, item) => sum + item.quantity, 0);
 
-      const existing = categorySales.get(category) || 0;
-      categorySales.set(category, existing + totalSales);
+      const existing = categoryMap.get(category) || { revenue: 0, orders: 0 };
+      categoryMap.set(category, {
+        revenue: existing.revenue + itemsRevenue,
+        orders: existing.orders + itemsCount
+      });
     });
 
-    // Calculate percentages
-    const totalSales = Array.from(categorySales.values()).reduce((sum, val) => sum + val, 0);
+    const totalRevenue = Array.from(categoryMap.values()).reduce((sum, cat) => sum + cat.revenue, 0);
 
-    const result = Array.from(categorySales.entries()).map(([name, value]) => ({
-      name,
-      value: totalSales > 0 ? Math.round((value / totalSales) * 100) : 0,
-      color: this.getRandomColor()
-    }));
-
-    return result;
+    return Array.from(categoryMap.entries())
+      .map(([name, data]) => ({
+        name,
+        value: totalRevenue > 0 ? Math.round((data.revenue / totalRevenue) * 100) : 0,
+        orders: data.orders,
+        revenue: data.revenue,
+        color: this.getCategoryColor(name)
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
   }
 
-  async getTopProducts(merchantId: string, limit: number = 5) {
+  private async getTopProducts(merchantId: string, dateRange: { start: Date; end: Date }) {
     const products = await prisma.product.findMany({
       where: { merchantId },
       select: {
         id: true,
         name: true,
         price: true,
-        orderItems: {
+        customerOrderItems: {
+          where: {
+            order: {
+              createdAt: {
+                gte: dateRange.start,
+                lte: dateRange.end
+              }
+            }
+          },
           select: {
             quantity: true
           }
@@ -165,227 +205,264 @@ export class DashboardService {
       }
     });
 
-    // Calculate orders and revenue for each product
-    const productsWithStats = products.map(product => {
-      const totalOrders = product.orderItems.reduce((sum, item) => sum + item.quantity, 0);
-      const totalRevenue = totalOrders * product.price;
+    return products
+      .map((product: any) => {
+        const totalOrders = product.customerOrderItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
+        const totalRevenue = totalOrders * product.price;
 
-      return {
-        name: product.name,
-        orders: totalOrders,
-        revenue: totalRevenue,
-      };
-    });
-
-    // Sort by orders and limit
-    return productsWithStats
-      .sort((a, b) => b.orders - a.orders)
-      .slice(0, limit);
+        return {
+          name: product.name,
+          orders: totalOrders,
+          revenue: totalRevenue,
+          rating: 4.5 // Default rating
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
   }
 
-  async getHourlyPattern(merchantId: string) {
-    // Get orders from the last 7 days for hourly pattern
-    const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  private async getRecentOrders(merchantId: string) {
+    const orders = await prisma.customerOrder.findMany({
+      where: { merchantId },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: { name: true }
+            }
+          }
+        }
+      }
+    });
 
-    const orders = await prisma.order.findMany({
+    return orders.map(order => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      totalAmount: order.totalAmount,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      createdAt: order.createdAt,
+      items: order.items.map(item => ({
+        productName: item.product.name,
+        quantity: item.quantity,
+        price: item.price
+      }))
+    }));
+  }
+
+  private async getLowStockProducts(merchantId: string) {
+    const products = await prisma.product.findMany({
       where: {
         merchantId,
-        createdAt: {
-          gte: startDate
-        }
+        stockQuantity: { lt: 10 }
       },
       select: {
-        createdAt: true,
-        orderItems: {
-          select: {
-            quantity: true
-          }
-        }
-      }
+        id: true,
+        name: true,
+        stockQuantity: true,
+        unit: true
+      },
+      orderBy: { stockQuantity: 'asc' }
     });
 
-    // Group by hour
-    const hourlyCounts = new Array(12).fill(0).map((_, i) => ({
-      hour: `${(i * 2) + 8}AM`,
-      orders: 0
-    }));
-
-    orders.forEach(order => {
-      const hour = order.createdAt.getHours();
-      // Map hours to our 12 time slots (8AM-8PM)
-      if (hour >= 8 && hour <= 20) {
-        const slot = Math.floor((hour - 8) / 2);
-        const itemsCount = order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
-        if (hourlyCounts[slot]) {
-          hourlyCounts[slot].orders += itemsCount;
-        }
-      }
-    });
-
-    return hourlyCounts;
+    return products;
   }
 
-  async getCustomerMetrics(merchantId: string) {
-    // Get customer data
-    const orders = await prisma.order.findMany({
-      where: { merchantId },
-      include: {
-        customer: {
-          select: {
-            id: true
+  private async getDeliveryZonePerformance(merchantId: string, dateRange: { start: Date; end: Date }) {
+    try {
+      // Get merchant's orders in time frame
+      const orders = await prisma.customerOrder.findMany({
+        where: {
+          merchantId,
+          createdAt: {
+            gte: dateRange.start,
+            lte: dateRange.end
           }
-        }
+        },
+        select: { id: true }
+      });
+
+      if (orders.length === 0) {
+        return [];
       }
-    });
 
-    const uniqueCustomers = new Set(orders.map(order => order.customer.id));
-    const totalOrders = orders.length;
-    const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-
-    // Calculate average order value
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-    // For repeat rate, we need to identify customers with multiple orders
-    const customerOrderCounts = new Map<string, number>();
-    orders.forEach(order => {
-      const count = customerOrderCounts.get(order.customer.id) || 0;
-      customerOrderCounts.set(order.customer.id, count + 1);
-    });
-
-    const repeatCustomers = Array.from(customerOrderCounts.values()).filter(count => count > 1).length;
-    const repeatRate = uniqueCustomers.size > 0 ? (repeatCustomers / uniqueCustomers.size) * 100 : 0;
-
-    // For rating, use default since Product model doesn't have rating field
-    const averageRating = 4.5;
-
-    return [
-      {
-        metric: 'New Customers',
-        value: uniqueCustomers.size,
-        change: '+12%' // Mock data - you can calculate real changes
-      },
-      {
-        metric: 'Repeat Rate',
-        value: `${Math.round(repeatRate)}%`,
-        change: '+5%' // Mock data
-      },
-      {
-        metric: 'Avg Order Value',
-        value: `₦${avgOrderValue.toLocaleString('en-NG', {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0
-        })}`,
-        change: '+8%' // Mock data
-      },
-      {
-        metric: 'Rating',
-        value: averageRating.toFixed(1),
-        change: '+0.2' // Mock data
-      }
-    ];
-  }
-
- async getDeliveryZonePerformance(merchantId: string) {
-  try {
-    // Get merchant's orders with their deliveries
-
-    const orders = await prisma.order.findMany({ where: { merchantId } });
-    if (!orders) {
-      throw new Error('Order not found');
-    }
-    const ordersWithDeliveries = await prisma.delivery.findMany({
-      where: { orderId: { in: orders.map(order => order.id) } },
-      select: {
-            deliveryAddress: true,
-            deliveryLatitude: true,
-            deliveryLongitude: true,
-            status: true,
-            pickedUpAt: true,
-            deliveredAt: true,
-            deliveryFee: true,
-            orderId: true,
-            assignedAt: true,
-
-          }
-    });
-
-    // Extract unique delivery zones from addresses
-    // This is a simplified approach - you might want to use geocoding API or pre-defined zones
-    const zoneData = new Map<string, {
-      orders: number,
-      deliveryTimeSum: number,
-      deliveryTimeCount: number,
-      deliveryFeeSum: number
-    }>();
-
-    ordersWithDeliveries.forEach(order => {
-      if (order) {
-        // Extract zone from address (simplified - takes first word before comma)
-        // Example: "123 Main St, Ikeja, Lagos" -> "Ikeja"
-        const address = order.deliveryAddress;
-        let zone : string | undefined = order.deliveryAddress || "Unknown";
-        
-        if (address) {
-          const parts = address.split(',');
-          if (parts.length > 1) {
-            zone = parts[1]?.trim().split(' ')[0]; // Take first word of second part
-          } else {
-            zone = address.split(' ')[0]; // Fallback to first word
-          }
+      // Get deliveries for these orders
+      const deliveries = await prisma.delivery.findMany({
+        where: {
+          orderId: { in: orders.map(o => o.id) },
+          status: 'DELIVERED'
+        },
+        select: {
+          deliveryAddress: true,
+          pickedUpAt: true,
+          deliveredAt: true
         }
+      });
 
-        const existing = zoneData.get(zone) || { 
-          orders: 0, 
-          deliveryTimeSum: 0, 
-          deliveryTimeCount: 0,
-          deliveryFeeSum: 0 
-        };
+      const zoneMap = new Map<string, { orders: number; deliveryTimes: number[] }>();
 
-        // Calculate delivery time if delivered
+      deliveries.forEach(delivery => {
+        const zone = this.extractZoneFromAddress(delivery.deliveryAddress);
+        const existing = zoneMap.get(zone) || { orders: 0, deliveryTimes: [] };
+
         let deliveryTime = 0;
-        if (order.deliveredAt && order.pickedUpAt) {
-          deliveryTime = (order.deliveredAt.getTime() - order.pickedUpAt.getTime()) / (1000 * 60); // minutes
-        } else if (order.deliveredAt && order.assignedAt) {
-          deliveryTime = (order.deliveredAt.getTime() - order.assignedAt.getTime()) / (1000 * 60); // minutes
+        if (delivery.deliveredAt && delivery.pickedUpAt) {
+          deliveryTime = (delivery.deliveredAt.getTime() - delivery.pickedUpAt.getTime()) / (1000 * 60);
         }
 
-        zoneData.set(zone, {
+        zoneMap.set(zone, {
           orders: existing.orders + 1,
-          deliveryTimeSum: existing.deliveryTimeSum + deliveryTime,
-          deliveryTimeCount: deliveryTime > 0 ? existing.deliveryTimeCount + 1 : existing.deliveryTimeCount,
-          deliveryFeeSum: existing.deliveryFeeSum + (order.deliveryFee || 0)
+          deliveryTimes: [...existing.deliveryTimes, deliveryTime]
         });
-      }
+      });
+
+      return Array.from(zoneMap.entries())
+        .map(([zone, data]) => ({
+          zone,
+          orders: data.orders,
+          deliveryTime: data.deliveryTimes.length > 0
+            ? Math.round(data.deliveryTimes.reduce((a, b) => a + b) / data.deliveryTimes.length)
+            : 0
+        }))
+        .sort((a, b) => b.orders - a.orders);
+    } catch (error) {
+      console.error('Error calculating delivery zones:', error);
+      return [];
+    }
+  }
+
+  private async getWalletBalance(merchantId: string) {
+    try {
+      const wallet = await prisma.merchantWallet.findUnique({
+        where: { merchantId },
+        select: { balance: true }
+      });
+
+      return wallet?.balance || 0;
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+      return 0;
+    }
+  }
+
+  private async getCustomerMetrics(merchantId: string, dateRange: { start: Date; end: Date }) {
+    try {
+      const orders = await prisma.customerOrder.findMany({
+        where: {
+          merchantId,
+          createdAt: {
+            gte: dateRange.start,
+            lte: dateRange.end
+          }
+        },
+        select: {
+          id: true,
+          totalAmount: true,
+          customerEmail: true
+        }
+      });
+
+      const uniqueCustomers = new Set(orders.map(o => o.customerEmail));
+      const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+
+      return {
+        newCustomers: uniqueCustomers.size,
+        repeatRate: 0, // Can be enhanced with historical data
+        averageOrderValue: orders.length > 0 ? totalRevenue / orders.length : 0,
+        averageRating: 4.5
+      };
+    } catch (error) {
+      console.error('Error calculating customer metrics:', error);
+      return {
+        newCustomers: 0,
+        repeatRate: 0,
+        averageOrderValue: 0,
+        averageRating: 0
+      };
+    }
+  }
+
+  // ===== HELPER METHODS =====
+
+  private getDateRange(timeFrame: 'today' | '7days' | '30days') {
+    const now = new Date();
+    const start = new Date();
+
+    switch (timeFrame) {
+      case 'today':
+        start.setHours(0, 0, 0, 0);
+        break;
+      case '7days':
+        start.setDate(start.getDate() - 7);
+        start.setHours(0, 0, 0, 0);
+        break;
+      case '30days':
+        start.setDate(start.getDate() - 30);
+        start.setHours(0, 0, 0, 0);
+        break;
+    }
+
+    return { start, end: now };
+  }
+
+  private groupOrdersByDay(orders: any[]) {
+    const groups = new Map<string, { totalRevenue: number; ordersCount: number }>();
+
+    orders.forEach(order => {
+      const day = order.createdAt.toLocaleDateString('en-US', { weekday: 'short' });
+
+      const existing = groups.get(day) || { totalRevenue: 0, ordersCount: 0 };
+      const itemsCount = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+
+      groups.set(day, {
+        totalRevenue: existing.totalRevenue + order.totalAmount,
+        ordersCount: existing.ordersCount + itemsCount
+      });
     });
 
-    // Convert to array and calculate averages
-    const result = Array.from(zoneData.entries()).map(([zone, data]) => ({
-      zone,
-      orders: data.orders,
-      deliveryTime: data.deliveryTimeCount > 0 
-        ? Math.round(data.deliveryTimeSum / data.deliveryTimeCount)
-        : 0,
-      averageFee: data.orders > 0
-        ? data.deliveryFeeSum / data.orders
-        : 0
-    }));
-
-    // Sort by number of orders (descending)
-    return result.sort((a, b) => b.orders - a.orders).slice(0, 10); // Top 10 zones
-
-  } catch (error) {
-    console.error('Error calculating delivery zone performance:', error);
-    return []; // Return empty array on error
+    return groups;
   }
-}
 
-  // Helper method to generate random colors for charts
-  private getRandomColor(): string {
-    const colors = [
-      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFE66D', '#95E1D3',
-      '#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088fe',
-      '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
+  private extractZoneFromAddress(address: string): string {
+    if (!address) return 'Unknown';
+
+    // Common zones in Lagos
+    const zones = [
+      'Ikeja', 'Victoria Island', 'Lekki', 'Surulere', 'Yaba',
+      'Ajah', 'Gbagada', 'Ikorodu', 'Magodo', 'Ogba',
+      'Maryland', 'Ojota', 'Anthony', 'Ilaje', 'Bariga'
     ];
-    return colors[Math.floor(Math.random() * colors.length)];
+
+    const addressLower = address.toLowerCase();
+    for (const zone of zones) {
+      if (addressLower.includes(zone.toLowerCase())) {
+        return zone;
+      }
+    }
+
+    // Extract from address pattern (second part after comma)
+    const parts = address.split(',');
+    if (parts.length > 1 && parts[1]) {
+      return parts[1].trim().split(' ')[0] || 'Unknown';
+    }
+
+    const firstWord = address.split(' ')[0];
+    return firstWord || 'Unknown';
+  }
+
+  private getCategoryColor(categoryName: string): string {
+    const colors = [
+      '#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088fe',
+      '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d',
+      '#4ECDC4', '#FF6B6B', '#45B7D1', '#FFE66D', '#95E1D3'
+    ];
+
+    const hash = categoryName.split('').reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+
+    return colors[Math.abs(hash) % colors.length] || colors[0];
   }
 }

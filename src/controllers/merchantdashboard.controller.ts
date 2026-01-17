@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../types/auth.types';
 import { DashboardService } from '../services/merchantdashboard.service';
 import prisma from '../config/database';
 
@@ -9,44 +10,23 @@ export class DashboardController {
     this.dashboardService = new DashboardService();
   }
 
-  async getMerchantStats(req: Request, res: Response) {
+  async getMerchantDashboard(req: AuthRequest, res: Response) {
     try {
-      console.log(req.user);
-      const merchantId = req.user?.id;
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
+      });
+
+      const merchantId = merchant?.id;
+
       if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
         });
       }
 
-      const stats = await this.dashboardService.getMerchantStats(merchantId);
-      res.json({
-        success: true,
-        data: stats
-      });
-    } catch (error: any) {
-      console.error('Error getting merchant stats:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch merchant statistics',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
-  }
+      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || 'today';
 
-  async getSalesTrend(req: Request, res: Response) {
-    try {
-      const merchantId = req.user?.userId;
-      if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
-        });
-      }
-
-      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || '7days';
-      
       // Validate timeFrame
       if (!['today', '7days', '30days'].includes(timeFrame)) {
         return res.status(400).json({
@@ -55,170 +35,72 @@ export class DashboardController {
         });
       }
 
-      const salesTrend = await this.dashboardService.getSalesTrend(merchantId, timeFrame);
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, timeFrame);
+
       res.json({
         success: true,
-        data: salesTrend,
-        timeFrame
+        data: dashboard
       });
     } catch (error: any) {
-      console.error('Error getting sales trend:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch sales trend data',
+      console.error('Error getting merchant dashboard:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch merchant dashboard',
         error: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   }
 
-  async getCategoryPerformance(req: Request, res: Response) {
+  async getStats(req: AuthRequest, res: Response) {
     try {
-      const merchantId = req.user?.userId;
-      if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
-        });
-      }
-
-      const categoryPerformance = await this.dashboardService.getCategoryPerformance(merchantId);
-      res.json({
-        success: true,
-        data: categoryPerformance
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
       });
-    } catch (error: any) {
-      console.error('Error getting category performance:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch category performance data',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
-  }
 
-  async getTopProducts(req: Request, res: Response) {
-    try {
-      const merchantId = req.user?.userId;
+      const merchantId = merchant?.id;
+
       if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
-        });
-      }
-
-      const limit = parseInt(req.query.limit as string) || 5;
-      if (isNaN(limit) || limit < 1 || limit > 50) {
-        return res.status(400).json({
+        return res.status(401).json({
           success: false,
-          message: 'Invalid limit parameter. Must be between 1 and 50'
+          message: 'Unauthorized: Merchant ID not found'
         });
       }
 
-      const topProducts = await this.dashboardService.getTopProducts(merchantId, limit);
+      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || 'today';
+
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, timeFrame);
+
       res.json({
         success: true,
-        data: topProducts,
-        limit
+        data: dashboard.stats
       });
     } catch (error: any) {
-      console.error('Error getting top products:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch top products data',
+      console.error('Error getting stats:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch stats',
         error: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   }
 
-  async getHourlyPattern(req: Request, res: Response) {
+  async getSalesTrend(req: AuthRequest, res: Response) {
     try {
-      const merchantId = req.user?.userId;
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
+      });
+
+      const merchantId = merchant?.id;
       if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
         });
       }
 
-      const hourlyPattern = await this.dashboardService.getHourlyPattern(merchantId);
-      res.json({
-        success: true,
-        data: hourlyPattern
-      });
-    } catch (error: any) {
-      console.error('Error getting hourly pattern:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch hourly pattern data',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
-  }
+      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || 'today';
 
-  async getCustomerMetrics(req: Request, res: Response) {
-    try {
-      const merchantId = req.user?.userId;
-      if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
-        });
-      }
-
-      const customerMetrics = await this.dashboardService.getCustomerMetrics(merchantId);
-      res.json({
-        success: true,
-        data: customerMetrics
-      });
-    } catch (error: any) {
-      console.error('Error getting customer metrics:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch customer metrics',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
-  }
-
-  async getDeliveryZonePerformance(req: Request, res: Response) {
-    try {
-      const merchantId = req.user?.userId;
-      if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
-        });
-      }
-
-      const deliveryZonePerformance = await this.dashboardService.getDeliveryZonePerformance(merchantId);
-      res.json({
-        success: true,
-        data: deliveryZonePerformance
-      });
-    } catch (error: any) {
-      console.error('Error getting delivery zone performance:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch delivery zone performance',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
-  }
-
-  async getDashboardAll(req: Request, res: Response) {
-    try {
-      const merchantId = req.user?.userId;
-      if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
-        });
-      }
-
-      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || '7days';
-      const limit = parseInt(req.query.limit as string) || 5;
-
-      // Validate parameters
+      // Validate timeFrame
       if (!['today', '7days', '30days'].includes(timeFrame)) {
         return res.status(400).json({
           success: false,
@@ -226,72 +108,192 @@ export class DashboardController {
         });
       }
 
-      if (isNaN(limit) || limit < 1 || limit > 50) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid limit parameter. Must be between 1 and 50'
-        });
-      }
-
-      // Execute all dashboard queries in parallel for better performance
-      const [
-        stats,
-        salesTrend,
-        categoryPerformance,
-        topProducts,
-        hourlyPattern,
-        customerMetrics,
-        deliveryZonePerformance
-      ] = await Promise.all([
-        this.dashboardService.getMerchantStats(merchantId),
-        this.dashboardService.getSalesTrend(merchantId, timeFrame),
-        this.dashboardService.getCategoryPerformance(merchantId),
-        this.dashboardService.getTopProducts(merchantId, limit),
-        this.dashboardService.getHourlyPattern(merchantId),
-        this.dashboardService.getCustomerMetrics(merchantId),
-        this.dashboardService.getDeliveryZonePerformance(merchantId)
-      ]);
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, timeFrame);
 
       res.json({
         success: true,
-        data: {
-          stats,
-          salesTrend,
-          categoryPerformance,
-          topProducts,
-          hourlyPattern,
-          customerMetrics,
-          deliveryZonePerformance
-        },
-        meta: {
-          timeFrame,
-          limit,
-          generatedAt: new Date().toISOString()
-        }
+        data: dashboard.salesTrend,
+        timeFrame
       });
     } catch (error: any) {
-      console.error('Error getting dashboard data:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Failed to fetch dashboard data',
+      console.error('Error getting sales trend:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch sales trend',
         error: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   }
 
-  async healthCheck(req: Request, res: Response) {
+  async getCategoryPerformance(req: AuthRequest, res: Response) {
+    try {
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
+      });
+
+      const merchantId = merchant?.id;
+      if (!merchantId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
+        });
+      }
+
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, 'today');
+
+      res.json({
+        success: true,
+        data: dashboard.categoryPerformance
+      });
+    } catch (error: any) {
+      console.error('Error getting category performance:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch category performance',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  async getTopProducts(req: AuthRequest, res: Response) {
+    try {
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
+      });
+
+      const merchantId = merchant?.id;
+      if (!merchantId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
+        });
+      }
+
+      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || 'today';
+
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, timeFrame);
+
+      res.json({
+        success: true,
+        data: dashboard.topProducts
+      });
+    } catch (error: any) {
+      console.error('Error getting top products:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch top products',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  async getLowStockProducts(req: AuthRequest, res: Response) {
+    try {
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
+      });
+
+      const merchantId = merchant?.id;
+      if (!merchantId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
+        });
+      }
+
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, 'today');
+
+      res.json({
+        success: true,
+        data: dashboard.lowStockProducts
+      });
+    } catch (error: any) {
+      console.error('Error getting low stock products:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch low stock products',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  async getDeliveryZonePerformance(req: AuthRequest, res: Response) {
+    try {
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
+      });
+
+      const merchantId = merchant?.id;
+      if (!merchantId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
+        });
+      }
+
+      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || 'today';
+
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, timeFrame);
+
+      res.json({
+        success: true,
+        data: dashboard.deliveryZones
+      });
+    } catch (error: any) {
+      console.error('Error getting delivery zones:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch delivery zones',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  async getCustomerMetrics(req: AuthRequest, res: Response) {
+    try {
+      const merchant = await prisma.merchant.findUnique({
+        where: { userId: req.user!.userId}
+      });
+
+      const merchantId = merchant?.id;
+      if (!merchantId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
+        });
+      }
+
+      const timeFrame = (req.query.timeFrame as 'today' | '7days' | '30days') || 'today';
+
+      const dashboard = await this.dashboardService.getMerchantDashboard(merchantId, timeFrame);
+
+      res.json({
+        success: true,
+        data: dashboard.customerMetrics
+      });
+    } catch (error: any) {
+      console.error('Error getting customer metrics:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to fetch customer metrics',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  async healthCheck(req: AuthRequest, res: Response) {
     try {
       const merchantId = req.user?.userId;
       if (!merchantId) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'Unauthorized: Merchant ID not found' 
+        return res.status(401).json({
+          success: false,
+          message: 'Unauthorized: Merchant ID not found'
         });
       }
 
       // Quick check if merchant exists
       const merchant = await prisma.merchant.findUnique({
-        where: { id: merchantId },
+        where: { userId: merchantId },
         select: { id: true, businessName: true }
       });
 
@@ -313,8 +315,8 @@ export class DashboardController {
       });
     } catch (error: any) {
       console.error('Dashboard health check error:', error);
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         message: 'Dashboard service health check failed',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });

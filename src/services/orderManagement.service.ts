@@ -224,14 +224,22 @@ export class OrderManagementService {
   }
 
   // Assign courier (Admin only)
-  async assignCourier(orderId: string, courierName: string, userId: string) {
-    const order = await prisma.customerOrder.update({
-      where: { id: orderId },
+  async assignCourier(orderId: string, courierId: string, userId: string) {
+    // Get the order
+    const order = await prisma.customerOrder.findUnique({
+      where: { id: orderId }
+    });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    // Update the delivery record with the rider
+    const delivery = await prisma.delivery.update({
+      where: { orderId },
       data: {
-        // Store courier info in metadata or create delivery record
-        metadata: {
-          courierName
-        }
+        riderId: courierId,
+        status: 'ASSIGNED'
       }
     });
 
@@ -240,11 +248,11 @@ export class OrderManagementService {
       data: {
         userId,
         action: 'courier_assigned',
-        description: `Courier ${courierName} assigned to order ${order.orderNumber}`
+        description: `Courier assigned to order ${order.orderNumber}`
       }
     });
 
-    return order;
+    return delivery;
   }
 
   // Cancel order

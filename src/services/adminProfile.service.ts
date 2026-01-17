@@ -33,7 +33,7 @@ export class AdminProfileService {
       isActive: user.isActive,
       twoFactorEnabled: user.twoFactorEnabled,
       joinedAt: user.joinedAt,
-      permissions: PERMISSIONS[user.role] || [],
+      permissions: PERMISSIONS[user.role as keyof typeof PERMISSIONS] || [],
       preferences: user.preferences,
       recentActivity: user.activityLogs.map(log => ({
         id: log.id,

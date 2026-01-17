@@ -401,7 +401,8 @@ export class AdminDashboardService {
                 id: { in: delayedDeliveriesFetch.map(d => d.order.merchantId) }
             }
         });
-        const merchantNames = merchants.map(m => m.businessName);
+        // Create a map of merchant ID to business name
+        const merchantMap = new Map(merchants.map(m => [m.id, m.businessName]));
         const delayedDeliveries = delayedDeliveriesFetch.map(d => {
             return {
                 id: d.id,
@@ -410,7 +411,7 @@ export class AdminDashboardService {
                 pickedUpAt: d.pickedUpAt,
                 deliveredAt: d.deliveredAt,
                 deliveryFee: d.deliveryFee,
-                merchantName: merchantNames.find(m => m === d.order.merchantId)
+                merchantName: merchantMap.get(d.order.merchantId) || 'Unknown Merchant'
             };
         });
 
