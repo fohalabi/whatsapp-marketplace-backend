@@ -40,8 +40,8 @@ export const authorize = (...allowedRoles: Role[]) => {
       });
     }
 
-    // console.log('User role:', req.user.role, typeof req.user.role);
-    // console.log('Allowed roles:', allowedRoles);
+    console.log('User role:', req.user.role, typeof req.user.role);
+    console.log('Allowed roles:', allowedRoles);
     
     // Convert string role to match enum
     const userRole = req.user.role as string;

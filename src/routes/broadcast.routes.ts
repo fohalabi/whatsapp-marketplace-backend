@@ -27,12 +27,12 @@ router.get('/broadcasts/:id/stats', authenticate, broadcastController.getBroadca
 
 router.post('/segments', authenticate, broadcastController.createSegment);
 router.get('/segments', authenticate, broadcastController.getSegments);
+router.get('/segments/tags', authenticate, broadcastController.getSegmentTags);
+router.post('/segments/estimate', authenticate, broadcastController.estimateSegmentSize);
 router.get('/segments/:id', authenticate, broadcastController.getSegment);
 router.put('/segments/:id', authenticate, broadcastController.updateSegment);
 router.delete('/segments/:id', authenticate, broadcastController.deleteSegment);
-router.post('/segments/estimate', authenticate, broadcastController.estimateSegmentSize);
 router.get('/segments/:id/stats', authenticate, broadcastController.getSegmentStats);
 router.post('/segments/:id/duplicate', authenticate, broadcastController.duplicateSegment);
-router.get('/segments/tags', authenticate, broadcastController.getSegmentTags);
 
 export default router;

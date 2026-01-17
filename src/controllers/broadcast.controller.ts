@@ -28,7 +28,7 @@ export class BroadcastController {
         data: result,
       });
     } catch (error: any) {
-      res.status(400).json({
+      res.status(500).json({
         success: false,
         message: error.message,
       });
@@ -61,7 +61,7 @@ export class BroadcastController {
         pagination: result.pagination,
       });
     } catch (error: any) {
-      res.status(400).json({
+      res.status(500).json({
         success: false,
         message: error.message,
       });
@@ -92,7 +92,7 @@ export class BroadcastController {
           message: error.message,
         });
       }
-      res.status(400).json({
+      res.status(500).json({
         success: false,
         message: error.message,
       });

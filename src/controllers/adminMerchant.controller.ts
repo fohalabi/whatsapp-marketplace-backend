@@ -53,7 +53,13 @@ export class AdminMerchantController {
         data: merchant
       });
     } catch (error: any) {
-      res.status(404).json({
+      if (error.message.includes('not found') || error.message.includes('No merchant')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      res.status(500).json({
         success: false,
         message: error.message
       });

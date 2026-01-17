@@ -51,7 +51,7 @@ export class MerchantController {
         data: result,
       });
     } catch (error: any) {
-      res.status(400).json({
+      res.status(500).json({
         success: false,
         message: error.message,
       });
@@ -75,6 +75,12 @@ export class MerchantController {
         data: profile || null,
       });
     } catch (error: any) {
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message,
+        });
+      }
       res.status(500).json({
         success: false,
         message: error.message,
