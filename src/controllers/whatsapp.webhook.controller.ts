@@ -440,8 +440,8 @@ export class WhatsAppWebhookController {
       return;
     }
 
-    // Calculate delivery fee
-    const deliveryFee = calculateDeliveryFee(
+    // ⚠️ CHANGED: calculateDeliveryFee is now async - add await
+    const deliveryFee = await calculateDeliveryFee(
       { latitude: order.merchant.latitude, longitude: order.merchant.longitude },
       { latitude, longitude }
     );
@@ -489,15 +489,16 @@ export class WhatsAppWebhookController {
       );
       return;
     }
-   // Geocode address to get real coordinates
-   const geocoded = await geocodeAddress(address);
-   const location = geocoded || FALLBACK_LOCATION; 
+
+    // Geocode address to get real coordinates
+    const geocoded = await geocodeAddress(address);
+    const location = geocoded || FALLBACK_LOCATION; 
     
     // use geocoded formatted address if available
     const finalAddress = geocoded?.formattedAddress || address;
 
-    // Calculate delivery fee
-    const deliveryFee = calculateDeliveryFee(
+    // ⚠️ CHANGED: calculateDeliveryFee is now async - add await
+    const deliveryFee = await calculateDeliveryFee(
       { latitude: merchant.latitude, longitude: merchant.longitude },
       location
     );

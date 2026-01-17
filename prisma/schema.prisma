@@ -891,6 +891,37 @@ model ErrorLog {
   @@index([severity, createdAt])
 }
 
+model PlatformConfig {
+  id        String   @id @default(cuid())
+  
+  // Business Hours
+  businessHoursEnabled Boolean @default(true)
+  openTime             String  @default("09:00")
+  closeTime            String  @default("18:00")
+  
+  // Delivery Fees (4 fixed routes)
+  mainlandToIsland     Float   @default(2500)
+  islandToMainland     Float   @default(2500)
+  mainlandToMainland   Float   @default(1500)
+  islandToIsland       Float   @default(1500)
+  
+  // Default Delivery Fee (fallback)
+  defaultDeliveryFee   Float   @default(2000)
+  
+  // Order Cutoff
+  orderCutoffEnabled   Boolean @default(true)
+  orderCutoffTime      String  @default("20:00")
+  
+  // Additional Settings
+  autoConfirmOrders    Boolean @default(false)
+  allowWeekendDelivery Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("platform_config")
+}
+
 enum Role {
   ADMIN
   MERCHANT
