@@ -9,7 +9,6 @@ export class RiderService {
         user: {
           select: {
             email: true,
-            phone: true,
           },
         },
       },

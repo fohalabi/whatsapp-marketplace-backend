@@ -3,6 +3,7 @@ import { AuthRequest } from '../types/auth.types';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { validateMagicBytes } from '../utils/magicBytes.utils';
 
 // Create uploads directory
 const uploadDir = path.join(__dirname, '../../uploads/merchants');
@@ -46,7 +47,7 @@ export const uploadVerificationFiles = multer({
   { name: 'productSample', maxCount: 1 }
 ]);
 
-// Validate files
+// Validate files with magic bytes
 export const validateVerificationFiles = (
   req: AuthRequest,
   res: Response,
@@ -66,6 +67,43 @@ export const validateVerificationFiles = (
       success: false,
       message: 'Product sample is required'
     });
+  }
+
+  // Validate magic bytes for all uploaded files
+  const filesToValidate: { file: Express.Multer.File; allowedTypes: string[] }[] = [];
+
+  if (files.profilePicture && files.profilePicture[0]) {
+    filesToValidate.push({ file: files.profilePicture[0], allowedTypes: ['jpeg', 'jpg', 'png'] });
+  }
+  if (files.governmentId && files.governmentId[0]) {
+    filesToValidate.push({ file: files.governmentId[0], allowedTypes: ['jpeg', 'jpg', 'png', 'pdf'] });
+  }
+  if (files.businessLicense && files.businessLicense[0]) {
+    filesToValidate.push({ file: files.businessLicense[0], allowedTypes: ['jpeg', 'jpg', 'png', 'pdf'] });
+  }
+  if (files.productSample && files.productSample[0]) {
+    filesToValidate.push({ file: files.productSample[0], allowedTypes: ['jpeg', 'jpg', 'png'] });
+  }
+
+  // Check magic bytes for each file
+  for (const { file, allowedTypes } of filesToValidate) {
+    const isValid = validateMagicBytes(file.path, allowedTypes);
+    
+    if (!isValid) {
+      // Delete all uploaded files
+      Object.values(files).forEach(fileArray => {
+        fileArray.forEach(f => {
+          if (fs.existsSync(f.path)) {
+            fs.unlinkSync(f.path);
+          }
+        });
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid file: ${file.originalname}. File signature does not match expected format.`
+      });
+    }
   }
 
   next();

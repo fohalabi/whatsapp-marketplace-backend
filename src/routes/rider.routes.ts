@@ -3,6 +3,14 @@ import { RiderController } from '../controllers/rider.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
+
+console.log('🚴 Rider Routes Loaded');
+
+router.use((req, res, next) => {
+  console.log('🚴 RIDER ROUTE HIT:', req.method, req.path);
+  next();
+});
+
 const riderController = new RiderController();
 
 router.use(authenticate);

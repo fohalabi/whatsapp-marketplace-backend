@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { ProductController } from '../controllers/product.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
-import { upload } from '../utils/upload.utils';
+import { upload, validateProductImage } from '../utils/upload.utils';
 
 const router = Router();
 const productController = new ProductController();
@@ -14,6 +14,7 @@ router.use(authorize('MERCHANT'));
 router.post(
   '/',
   upload.array('images', 5),
+  validateProductImage,
   (req, res) => productController.createProduct(req, res)
 );
 

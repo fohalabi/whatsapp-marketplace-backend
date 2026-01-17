@@ -1,6 +1,8 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { Request, Response, NextFunction } from 'express';
+import { validateMagicBytes } from '../utils/magicBytes.utils';
 
 // Create uploads directory if it doesn't exist
 const uploadDir = path.join(__dirname, '../../uploads/products');
@@ -39,3 +41,44 @@ export const upload = multer({
   },
   fileFilter: fileFilter,
 });
+
+// Magic bytes validation middleware (use this AFTER multer upload)
+export const validateProductImage = (req: Request, res: Response, next: NextFunction) => {
+  const file = req.file;
+  const files = req.files as Express.Multer.File[] | undefined;
+
+  const filesToValidate: Express.Multer.File[] = [];
+  
+  if (file) {
+    filesToValidate.push(file);
+  }
+  
+  if (files && Array.isArray(files)) {
+    filesToValidate.push(...files);
+  }
+
+  if (filesToValidate.length === 0) {
+    return next();
+  }
+
+  // Validate magic bytes for each uploaded file
+  for (const uploadedFile of filesToValidate) {
+    const isValid = validateMagicBytes(uploadedFile.path, ['jpeg', 'jpg', 'png', 'gif', 'webp']);
+    
+    if (!isValid) {
+      // Delete all uploaded files
+      filesToValidate.forEach(f => {
+        if (fs.existsSync(f.path)) {
+          fs.unlinkSync(f.path);
+        }
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid image file: ${uploadedFile.originalname}. File signature does not match expected image format.`
+      });
+    }
+  }
+
+  next();
+};

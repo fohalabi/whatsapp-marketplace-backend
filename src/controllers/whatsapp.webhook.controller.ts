@@ -683,7 +683,7 @@ export class WhatsAppWebhookController {
 
   private async sendWelcomeMessage(customerPhone: string) {
     const welcomeMessage = `
-  👋 Welcome to [Your Business Name]!
+  👋 Welcome to Jasper's Market!
 
   We're excited to serve you. Here's what you can do:
 

@@ -79,11 +79,11 @@ app.use('/api/team', teamRoutes);
 app.use('/api/merchant', merchantRoutes);
 app.use('/api/merchant/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/merchantdashboard', merchantDashboardRoutes);
+app.use('/api/merchant/dashboard', merchantDashboardRoutes);
 app.use('/api/admin/profile', adminProfileRoutes);
 app.use('/api/admin/merchants', adminMerchantRoutes);
 app.use('/api/admin/products', adminProductRoute);
-app.use('/api/whatsapp', whatsappRoutes); // Regular WhatsApp routes
+app.use('/api/whatsapp', whatsappRoutes); 
 app.use('/api/admin/team', teamManagementRoutes);
 app.use('/api/admin/broadcast', broadcastRoutes);
 app.use('/api/admin/refunds', refundRoutes);
@@ -91,17 +91,16 @@ app.use('/api/admin/abandoned-orders', abandonedOrderRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/rider/wallet', riderWalletRoutes);
 app.use('/api/riders/approval', riderApprovalRoutes);
-app.use('/api/rider', riderRoutes);
+app.use('/api/riders', riderRoutes);
+app.use('/api/rider/wallet', riderWalletRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/order-management', orderManagementRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/fulfillment', fulfullmentRoutes);
 app.use('/api/stock', merchantStockRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
-app.use('/api/fulfillment', fulfullmentRoutes);
-app.use('/api', merchantStockRoutes);
+app.use('/api/stocks', merchantStockRoutes);
 
 
 
