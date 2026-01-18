@@ -5,23 +5,20 @@ import { getRedis } from '../config/redis';
 const REDIS_CONFIG_KEY = 'platform:config';
 
 export class ConfigController {
-  /**
-   * GET /api/platform/config - Get current platform configuration
-   */
   async getConfig(req: Request, res: Response) {
     try {
-      const redis = getRedis();
+      // const redis = getRedis();
 
-      // Try Redis cache first
-      const cached = await redis.get(REDIS_CONFIG_KEY);
-      if (cached) {
-        console.log('✅ Config loaded from Redis cache');
-        return res.json({
-          success: true,
-          data: JSON.parse(cached),
-          source: 'cache'
-        });
-      }
+      // // Try Redis cache first
+      // const cached = await redis.get(REDIS_CONFIG_KEY);
+      // if (cached) {
+      //   console.log('✅ Config loaded from Redis cache');
+      //   return res.json({
+      //     success: true,
+      //     data: JSON.parse(cached),
+      //     source: 'cache'
+      //   });
+      // }
 
       // Fallback to database
       let config = await prisma.platformConfig.findFirst({
@@ -51,7 +48,7 @@ export class ConfigController {
       }
 
       // Cache in Redis (7 days TTL)
-      await redis.setex(REDIS_CONFIG_KEY, 7 * 24 * 60 * 60, JSON.stringify(config));
+      // await redis.setex(REDIS_CONFIG_KEY, 7 * 24 * 60 * 60, JSON.stringify(config));
 
       return res.json({
         success: true,
@@ -69,9 +66,6 @@ export class ConfigController {
     }
   }
 
-  /**
-   * PUT /api/platform/config - Update platform configuration
-   */
   async updateConfig(req: Request, res: Response) {
     try {
       const {
@@ -169,8 +163,8 @@ export class ConfigController {
       });
 
       
-      const redis = getRedis();
-      await redis.setex(REDIS_CONFIG_KEY, 7 * 24 * 60 * 60, JSON.stringify(updatedConfig));
+      // const redis = getRedis();
+      // await redis.setex(REDIS_CONFIG_KEY, 7 * 24 * 60 * 60, JSON.stringify(updatedConfig));
 
       console.log('✅ Platform config updated and cached');
 

@@ -99,6 +99,22 @@ export class BroadcastController {
     }
   }
 
+  async getTemplateCategories(req: Request, res: Response) {
+    try {
+      const categories = await broadcastService.getTemplateCategories();
+      
+      res.status(200).json({
+        success: true,
+        data: categories,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
   async updateTemplate(req: Request, res: Response) {
     try {
       const { id } = req.params;

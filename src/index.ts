@@ -102,7 +102,7 @@ app.use('/api/fulfillment', fulfullmentRoutes);
 app.use('/api/stock', merchantStockRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/stocks', merchantStockRoutes);
-app.use('api/platform', configRoutes);
+app.use('/api/platform', configRoutes);
 
 
 

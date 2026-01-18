@@ -125,6 +125,23 @@ export class BroadcastService {
     return template;
   }
 
+  async getTemplateCategories(): Promise<string[]> {
+    // Get all unique categories from templates
+    const templates = await prisma.broadcastTemplate.findMany({
+      select: { category: true },
+      distinct: ['category']
+    });
+
+    const categories = templates.map(t => t.category).filter(Boolean);
+    
+    // Return default categories if none exist
+    if (categories.length === 0) {
+      return ['MARKETING', 'TRANSACTIONAL', 'PROMOTIONAL', 'NOTIFICATION'];
+    }
+    
+    return categories;
+  }
+
   async updateTemplate(id: string, data: UpdateTemplateDTO, userId: string) {
     const template = await prisma.broadcastTemplate.findUnique({
       where: { id }

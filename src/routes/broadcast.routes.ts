@@ -6,6 +6,7 @@ const router = Router();
 
 router.post('/templates', authenticate, broadcastController.createTemplate);
 router.get('/templates', authenticate, broadcastController.getTemplates);
+router.get('/templates/categories', authenticate, broadcastController.getTemplateCategories);
 router.get('/templates/:id', authenticate, broadcastController.getTemplate);
 router.put('/templates/:id', authenticate, broadcastController.updateTemplate);
 router.delete('/templates/:id', authenticate, broadcastController.deleteTemplate);
