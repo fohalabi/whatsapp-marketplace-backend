@@ -922,6 +922,51 @@ model PlatformConfig {
   @@map("platform_config")
 }
 
+model Integration {
+  id                String   @id @default(cuid())
+  
+  // Integration details
+  integrationId     String   @unique // 'whatsapp-api', 'paystack'
+  name              String
+  description       String?
+  category          IntegrationCategory
+  
+  // Connection status
+  status            IntegrationStatus @default(DISCONNECTED)
+  lastSync          DateTime?
+  
+  // Encrypted credentials
+  encryptedApiKey       String?
+  encryptedApiSecret    String?
+  encryptedWebhookUrl   String?
+  encryptionIv          String?
+  
+  // Configuration
+  endpoint          String?
+  version           String?
+  metadata          Json?   // Extra config per integration
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  connectedAt       DateTime?
+  
+  @@map("integrations")
+}
+
+enum IntegrationCategory {
+  COMMUNICATION
+  PAYMENT
+  DELIVERY
+  ANALYTICS
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
 enum Role {
   ADMIN
   MERCHANT

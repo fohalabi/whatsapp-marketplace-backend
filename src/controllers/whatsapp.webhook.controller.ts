@@ -168,6 +168,7 @@ export class WhatsAppWebhookController {
 
       console.log(`🛒 Order received from ${customerPhone}`, { orderId, catalogId });
 
+      // check for duplicate order
       const existingOrder = await prisma.customerOrder.findFirst({
         where: {
           customerPhone,
@@ -192,6 +193,7 @@ export class WhatsAppWebhookController {
         price: parseFloat(item.item_price) || 0,
         currency: item.currency || 'NGN'
       })) || [];
+      
       if (items.length === 0) {
         console.log('Order received with no items');
         return;
